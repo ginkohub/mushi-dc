@@ -26,9 +26,7 @@ const client = new Client({
   partials: [Partials.Channel, Partials.Message]
 });
 
-client.once(Events.ClientReady, async (evt) => {
-  pen.Info('Client is ready', evt.user.tag);
-});
+
 
 client.commands = new Collection();
 const commands = [];
@@ -97,18 +95,22 @@ await walkCommands(commandPath);
 pen.Debug(`${commands.length} commands loaded`)
 pen.Debug(`${eventOn.length} event loaded`);
 
-const rest = new REST({ 'version': '10' }).setToken(process.env.DISCORD_TOKEN);
-if (process.env.DISCORD_GUILD_ID) {
-  await rest.put(
-    Routes.applicationGuildCommands(process.env.DISCORD_CLIENT_ID, process.env.DISCORD_GUILD_ID),
-    { body: commands }
-  );
-} else {
-  await rest.put(
-    Routes.applicationCommands(process.env.DISCORD_CLIENT_ID),
-    { body: commands }
-  );
-}
+client.once(Events.ClientReady, async (evt) => {
+  pen.Info('Client is ready', evt.user.tag);
+
+  const rest = new REST({ 'version': '10' }).setToken(process.env.DISCORD_TOKEN);
+  if (process.env.DISCORD_GUILD_ID) {
+    await rest.put(
+      Routes.applicationGuildCommands(process.env.DISCORD_CLIENT_ID, process.env.DISCORD_GUILD_ID),
+      { body: commands }
+    );
+  } else {
+    await rest.put(
+      Routes.applicationCommands(process.env.DISCORD_CLIENT_ID),
+      { body: commands }
+    );
+  }
+});
 
 /** @param {import('discord.js').ChatInputCommandInteraction} m */
 client.on(Events.InteractionCreate, async (m) => {
