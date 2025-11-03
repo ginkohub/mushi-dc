@@ -114,5 +114,5 @@ export class Gemini {
 export const gemini = new Gemini({
   apiKey: process.env.GEMINI_API_KEY,
   modelName: process.env.GEMINI_MODEL ?? 'gemini-2.5-flash',
-  systemInstruction: DEFAULT_SYSTEM_INSTRUCTION.join(' '),
+  systemInstruction: process.env.SYSTEM_INSTRUCTION ?? DEFAULT_SYSTEM_INSTRUCTION.join(' '),
 });
