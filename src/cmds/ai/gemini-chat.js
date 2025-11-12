@@ -40,27 +40,20 @@ function cleanText(text) {
 
 /**
   * @param {import('discord.js').ChatInputCommandInteraction} m
-  * @param {string} text
+  * @param {Array<import('@google/genai').PartListUnion>} parts
   */
-async function chat(m, text) {
-  // pen.Debug(m);
-
+async function chat(m, parts) {
   if (m.deferReply) {
     await m.deferReply();
   } else {
     m.channel.sendTyping();
   }
 
-  text = text?.trim();
-  if (!text | text?.length === 0) return;
-
-  pen.Debug(text);
+  if (!parts | parts?.length === 0) return;
 
   try {
     const resp = await gemini.chat(CHAT_ID, {
-      message: [
-        { text: text }
-      ]
+      message: parts
     });
 
     const content = { content: resp.text?.trim() };
@@ -88,8 +81,8 @@ export const cmd = {
   async execute(m) {
     let text = m.options.getString('text')?.trim();
     if (!text | text?.length === 0) return;
-    text = `${getName(m)}: ${cleanText(text)}`
-    await chat(m, text);
+    text = `${getName(m)}: ${cleanText(text)}`;
+    await chat(m, [{ text: text }]);
   }
 }
 
@@ -98,7 +91,7 @@ export const cmd = {
  * @param {import('discord.js').Client} client
  */
 export const on = async (m, client) => {
-  let texts = [];
+  let parts = [];
   let stat = m.mentions?.has(client.user) || false;
 
   if (m.reference) {
@@ -106,17 +99,47 @@ export const on = async (m, client) => {
     if (quoted.author.id === client.user.id) stat = true;
     if (stat) {
       const text = cleanText(quoted.content);
-      if (text.length > 0) texts.push(`<${getName(quoted)}>: ${text}`);
+      if (text.length > 0) parts.push({ text: `<${getName(quoted)}>: ${text}` });
+
+      if (quoted?.attachments?.size > 0) {
+        for (const att of quoted.attachments.values()) {
+          const resp = await fetch(att.url);
+          const buff = await resp?.arrayBuffer();
+
+          if (buff) {
+            parts.push({
+              inlineData: {
+                data: Buffer.from(buff).toString('base64'),
+                mimeType: att.contentType ?? 'unknown'
+              }
+            });
+          }
+        };
+      }
     }
   }
+
   if (stat) {
     const text = cleanText(m.content);
-    if (text.length > 0) texts.push(`<${getName(m)}>: ${text}`);
+    if (text.length > 0) parts.push({ text: `<${getName(m)}>: ${text}` });
+
+    for (const att of m?.attachments?.values()) {
+      const resp = await fetch(att.url);
+      const buff = await resp?.arrayBuffer();
+
+      if (buff) {
+        parts.push({
+          inlineData: {
+            data: Buffer.from(buff).toString('base64'),
+            mimeType: att.contentType ?? 'unknown'
+          }
+        });
+      }
+    };
   }
 
-  if (texts.length > 0) {
-    let text = texts.join('\n');
-    await chat(m, text);
+  if (parts.length > 0) {
+    await chat(m, parts);
   }
 }
 
