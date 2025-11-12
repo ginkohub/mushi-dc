@@ -11,7 +11,7 @@ pen.Debug('Gemini model name:', gemini.modelName);
  * @returns {string}
  */
 function getName(m) {
-  let senderName = m.user?.username;
+  let senderName = m.user?.username ?? m.author?.username;
 
   if (m.user) {
     if (m.user?.globalName) senderName = m.user.globalName;
