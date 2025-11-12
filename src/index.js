@@ -87,6 +87,16 @@ client.on(Events.MessageCreate, async (m) => {
   }
 });
 
+client.on(Events.MessageUpdate, async (_, m) => {
+  for (const on of eventOn) {
+    try {
+      await on(m, client);
+    } catch (e) {
+      pen.Error(e)
+    }
+  }
+})
+
 // Load commands
 const commandPath = path.join(import.meta.dirname, 'cmds');
 pen.Debug('Loading commands', commandPath);
