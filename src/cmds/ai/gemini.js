@@ -18,7 +18,7 @@ import { GoogleGenAI } from '@google/genai';
  */
 
 const DEFAULT_SYSTEM_INSTRUCTION = [
-  'Nama lu Mushi, humble, expert tentang aja, kalem, gk banyak ngomong, gk suka pamer.',
+  'Nama lu Mushi, humble, expert tentang medis dan programming, kalem, gk banyak ngomong, gk suka pamer.',
   'Bicara pake bahasa sehari-hari "lu" "gw".',
   'Sebisa mungkin persingkat kalimat, seperti sedang chat di Discord.',
   'Balas tanpa format percakapan dan ingat max 2000 karakter.'
@@ -69,15 +69,8 @@ export class Gemini {
     this.chats = new Map();
   }
 
-  /**
-   * @param {string} id
-   * @param {import('@google/genai').SendMessageParameters} params
-   * @returns {Promise<import('@google/genai').GenerateContentResponse>}
-   */
-  async chat(id, params) {
-    if (!id) return;
-    if (!params) return;
-    let chat = this.chats.get(id);
+  genChat(id, force) {
+    let chat = force ? null : this.chats.get(id);
     if (!chat) {
       chat = this.genAI.chats.create({
         model: this.modelName,
@@ -89,8 +82,24 @@ export class Gemini {
       })
       this.chats.set(id, chat);
     }
+    return chat;
+  }
 
-    return await chat.sendMessage(params);
+  /**
+   * @param {string} id
+   * @param {import('@google/genai').SendMessageParameters} params
+   * @returns {Promise<import('@google/genai').GenerateContentResponse>}
+   */
+  async chat(id, params) {
+    if (!id) return;
+    if (!params) return;
+    let chat = this.genChat(id, true);
+    try {
+      return await chat.sendMessage(params);
+    } catch (e) {
+      chat = this.genChat(id, true);
+      return await chat.sendMessage(params);
+    }
   }
 
   /**
