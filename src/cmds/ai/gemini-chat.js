@@ -2,8 +2,6 @@ import { SlashCommandBuilder } from 'discord.js';
 import pen from '../../pen.js';
 import { gemini } from './gemini.js';
 
-const CHAT_ID = 'DUMMY';
-
 pen.Debug('Gemini model name:', gemini.modelName);
 
 /** 
@@ -52,7 +50,7 @@ async function chat(m, parts) {
   if (!parts | parts?.length === 0) return;
 
   try {
-    const resp = await gemini.chat(CHAT_ID, {
+    const resp = await gemini.chat(m.guildId ?? m.channelId, {
       message: parts
     });
 
