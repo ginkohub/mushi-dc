@@ -66,7 +66,7 @@ async function chat(m, parts) {
   }
 }
 
-export const cmd = {
+export const slash = {
   data: new SlashCommandBuilder().setName('gm')
     .setDescription('Ask everything to Gemini')
     .addStringOption(option =>
@@ -85,10 +85,12 @@ export const cmd = {
 }
 
 /** 
- * @param {import('discord.js').Message} m
- * @param {import('discord.js').Client} client
+ * @param {import('../../context.js').Ctx} c
  */
-export const on = async (m, client) => {
+async function onMessage(c) {
+  const m = c.event;
+  const client = c.client();
+
   let parts = [];
   let stat = m.mentions?.has(client.user) || false;
 
@@ -117,8 +119,8 @@ export const on = async (m, client) => {
     }
   }
 
-  if (stat) {
-    const text = cleanText(m.content);
+  if (stat || c.isCMD) {
+    const text = c.isCMD ? c.args : cleanText(m.content);
     if (text.length > 0) parts.push({ text: `<${getName(m)}>: ${text}` });
 
     for (const att of m?.attachments?.values()) {
@@ -141,4 +143,18 @@ export const on = async (m, client) => {
   }
 }
 
+/** @type {import('../../plugin.js').Plugin[]} */
+export default [
+  {
+    exec: async (c) => {
+      const m = c.event;
+      const client = c.client();
 
+      let stat = m.mentions?.has(client.user) || false;
+      if (stat && !m.author.bot) onMessage(c);
+    }
+  }, {
+    cmd: ['gm', 'gemini'],
+    exec: onMessage
+  }
+]
