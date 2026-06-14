@@ -71,6 +71,9 @@ export class Handler {
   /* Slash command */
   this.slashs = new Map();
 
+  /** @type {Map<string, Function>} */
+  this.autoc = new Map();
+
   /** @type {Array} */
   this.watchID = [];
 
@@ -299,6 +302,7 @@ export class Handler {
     this.genCMD(newid, plugin);
    } else if (plugin.data) {
     this.slashs.set(plugin.data.name, newid);
+    if (opt.autocomplete) this.autoc.set(plugin.data.name, opt.autocomplete);
    } else {
     this.listens.set(newid, newid);
    }
@@ -488,6 +492,12 @@ export class Handler {
  async handle({ event, oldEvent, eventType, eventName }) {
   try {
    if (event?.author?.bot) return;
+
+   if (event?.isAutocomplete?.()) {
+    const fn = this.autoc.get(event.commandName);
+    if (fn) await fn(event);
+    return;
+   }
 
    const ctx = new Ctx({
     handler: this,
