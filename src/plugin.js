@@ -15,21 +15,21 @@ import { Reason } from './reason.js';
  * @enum {number | string | any}
  */
 export const Role = Object.freeze({
- BLOCKED: 0,
- GUEST: 1,
- USER: 10,
- PREMIUM: 100,
- ADMIN: 1000,
- OWNER: 10000,
+  BLOCKED: 0,
+  GUEST: 1,
+  USER: 10,
+  PREMIUM: 100,
+  ADMIN: 1000,
+  OWNER: 10000,
 });
 
 export const RoleMoji = Object.freeze({
- [Role.BLOCKED]: '🚫',
- [Role.GUEST]: '👤',
- [Role.USER]: '🤵',
- [Role.PREMIUM]: '💼',
- [Role.ADMIN]: '🛡️',
- [Role.OWNER]: '👑',
+  [Role.BLOCKED]: '🚫',
+  [Role.GUEST]: '👤',
+  [Role.USER]: '🤵',
+  [Role.PREMIUM]: '💼',
+  [Role.ADMIN]: '🛡️',
+  [Role.OWNER]: '👑',
 });
 
 /**
@@ -56,117 +56,120 @@ export const RoleMoji = Object.freeze({
  * Plugin class for handling event as listener or command
  */
 export class Plugin {
- /** @param {Plugin} */
- constructor({
-  data,
-  cmd,
-  prefix,
-  desc,
-  cat,
-  tags,
-  disabled,
-  hidden,
-  roles,
-  timeout,
-  noPrefix,
-  midware,
-  exec,
-  final,
-  location,
- }) {
-  /** @type {import('./handler.js').Handler} */
-  this.handler = null;
+  /** @param {Plugin} */
+  constructor({
+    data,
+    cmd,
+    prefix,
+    desc,
+    cat,
+    tags,
+    disabled,
+    hidden,
+    roles,
+    timeout,
+    noPrefix,
+    midware,
+    exec,
+    final,
+    location,
+  }) {
+    /** @type {import('./handler.js').Handler} */
+    this.handler = null;
 
-  /** @type {import('discord.js').Client} */
-  this.client = null;
+    /** @type {import('discord.js').Client} */
+    this.client = null;
 
-  /** @type {import('discord.js').SlashCommandBuilder} */
-  this.data = data;
+    /** @type {import('discord.js').SlashCommandBuilder} */
+    this.data = data;
 
-  /** @type {string | string[]}*/
-  this.cmd = cmd;
+    /** @type {string | string[]}*/
+    this.cmd = cmd;
 
-  /** @type {string} */
-  this.prefix = prefix;
+    /** @type {string} */
+    this.prefix = prefix;
 
-  /** @type {boolean} */
-  this.noPrefix = noPrefix;
+    /** @type {boolean} */
+    this.noPrefix = noPrefix;
 
-  /** @type {string} */
-  this.desc = desc;
+    /** @type {string} */
+    this.desc = desc;
 
-  /** @type {string[]} */
-  this.tags = tags;
+    /** @type {string[]} */
+    this.tags = tags;
 
-  /** @type {string} */
-  this.cat = cat && cat !== '' ? cat : 'uncategorized';
+    /** @type {string} */
+    this.cat = cat && cat !== '' ? cat : 'uncategorized';
 
-  /** @type {boolean} */
-  this.disabled = disabled;
+    /** @type {boolean} */
+    this.disabled = disabled;
 
-  /** @type {boolean} */
-  this.hidden = hidden;
+    /** @type {boolean} */
+    this.hidden = hidden;
 
-  /** @type {Array<Role> | any} */
-  this.roles = roles;
+    /** @type {Array<Role> | any} */
+    this.roles = roles;
+
+    /**
+     * Timeout in second
+     *
+     * @type {number}
+     */
+    this.timeout = timeout;
+
+    /** @type {(c: import('./context.js').Ctx) => Promise<Reason> | Reason} */
+    this.midware = midware;
+
+    /** @type {(c: import('./context.js').Ctx) => Promise<void>} */
+    this.exec = exec;
+
+    /** @type {(c: import('./context.js').Ctx, reason: Reason) => Promise<void>} */
+    this.final = final;
+
+    /** @type {string} */
+    this.location = location;
+  }
 
   /**
-   * Timeout in second
+   * Checker before execution
    *
-   * @type {number}
+   * @param {import('./context.js').Ctx} ctx
+   * @return {Promise<Reason>}
    */
-  this.timeout = timeout;
+  async check(ctx) {
+    const res = new Reason({
+      success: true,
+      code: 'plugin-checker',
+      author: this.location,
+      message: 'This plugin is ready to execute',
+    });
 
-  /** @type {(c: import('./context.js').Ctx) => Promise<Reason> | Reason} */
-  this.midware = midware;
+    if (this.roles && Array.isArray(this.roles) && !ctx.fromMe) {
+      const min = Math.min(...this.roles);
+      const max = Math.max(...(ctx.roles || []));
 
-  /** @type {(c: import('./context.js').Ctx) => Promise<void>} */
-  this.exec = exec;
+      if (max < min) {
+        return res
+          .setSuccess(false)
+          .setCode('plugin-role-insufficient')
+          .setMessage("User don't have the required role");
+      }
+    }
 
-  /** @type {(c: import('./context.js').Ctx, reason: Reason) => Promise<void>} */
-  this.final = final;
+    if (this.disabled) {
+      return res.setSuccess(false).setCode('plugin-disabled').setMessage('This plugin is disabled');
+    }
 
-  /** @type {string} */
-  this.location = location;
- }
+    if (this.timeout > 0) {
+      const diff = Date.now() - ctx.timestamp;
+      if (diff > this.timeout * 1000) {
+        return res.setSuccess(false).setCode('plugin-timeout').setMessage('This plugin is timed out');
+      }
+    }
 
- /**
-  * Checker before execution
-  *
-  * @param {import('./context.js').Ctx} ctx
-  * @return {Promise<Reason>}
-  */
- async check(ctx) {
-  const res = new Reason({
-   success: true,
-   code: 'plugin-checker',
-   author: this.location,
-   message: 'This plugin is ready to execute',
-  });
-
-  if (this.roles && Array.isArray(this.roles) && !ctx.fromMe) {
-   const min = Math.min(...this.roles);
-   const max = Math.max(...(ctx.roles || []));
-
-   if (max < min) {
-    return res.setSuccess(false).setCode('plugin-role-insufficient').setMessage("User don't have the required role");
-   }
+    if (this.midware) {
+      return new Reason(await this.midware(ctx));
+    }
+    return res;
   }
-
-  if (this.disabled) {
-   return res.setSuccess(false).setCode('plugin-disabled').setMessage('This plugin is disabled');
-  }
-
-  if (this.timeout > 0) {
-   const diff = Date.now() - ctx.timestamp;
-   if (diff > this.timeout * 1000) {
-    return res.setSuccess(false).setCode('plugin-timeout').setMessage('This plugin is timed out');
-   }
-  }
-
-  if (this.midware) {
-   return new Reason(await this.midware(ctx));
-  }
-  return res;
- }
 }

@@ -13,40 +13,40 @@ import { ApplicationIntegrationType, InteractionContextType, SlashCommandBuilder
 import { Role } from '#mushi';
 
 async function shell(c) {
- const cmd = c.isSlash ? c.event.options.getString('command') || '' : c.args?.trim() || '';
- if (!cmd) return await c.react('❌');
+  const cmd = c.isSlash ? c.event.options.getString('command') || '' : c.args?.trim() || '';
+  if (!cmd) return await c.react('❌');
 
- try {
-  const out = execSync(cmd, { encoding: 'utf-8', timeout: 30000 });
-  const reply = `$ ${cmd}\n${out}`.trim();
-  if (reply.length > 2000) {
-   await c.event.channel.send({
-    files: [{ attachment: Buffer.from(reply), name: 'output.txt' }],
-   });
-  } else {
-   await c.reply(reply || '(empty output)');
+  try {
+    const out = execSync(cmd, { encoding: 'utf-8', timeout: 30000 });
+    const reply = `$ ${cmd}\n${out}`.trim();
+    if (reply.length > 2000) {
+      await c.event.channel.send({
+        files: [{ attachment: Buffer.from(reply), name: 'output.txt' }],
+      });
+    } else {
+      await c.reply(reply || '(empty output)');
+    }
+  } catch {
+    await c.react('❌');
   }
- } catch {
-  await c.react('❌');
- }
 }
 
 export default [
- {
-  cmd: ['shell', 'sh', '!'],
-  cat: 'system',
-  desc: 'Execute shell commands',
-  roles: [Role.OWNER],
-  exec: shell,
- },
- {
-  roles: [Role.OWNER],
-  data: new SlashCommandBuilder()
-   .setName('shell')
-   .setDescription('Execute shell commands')
-   .addStringOption((o) => o.setName('command').setDescription('Shell command to execute').setRequired(true))
-   .setIntegrationTypes(ApplicationIntegrationType.GuildInstall, ApplicationIntegrationType.UserInstall)
-   .setContexts(InteractionContextType.Guild, InteractionContextType.BotDM, InteractionContextType.PrivateChannel),
-  exec: shell,
- },
+  {
+    cmd: ['shell', 'sh', '!'],
+    cat: 'system',
+    desc: 'Execute shell commands',
+    roles: [Role.OWNER],
+    exec: shell,
+  },
+  {
+    roles: [Role.OWNER],
+    data: new SlashCommandBuilder()
+      .setName('shell')
+      .setDescription('Execute shell commands')
+      .addStringOption((o) => o.setName('command').setDescription('Shell command to execute').setRequired(true))
+      .setIntegrationTypes(ApplicationIntegrationType.GuildInstall, ApplicationIntegrationType.UserInstall)
+      .setContexts(InteractionContextType.Guild, InteractionContextType.BotDM, InteractionContextType.PrivateChannel),
+    exec: shell,
+  },
 ];

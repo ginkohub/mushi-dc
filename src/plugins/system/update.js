@@ -15,55 +15,55 @@ import { Role } from '#mushi';
 const run = (cmd) => execSync(cmd, { encoding: 'utf-8' });
 
 async function update(c) {
- try {
-  const parts = [];
   try {
-   parts.push(run('git stash push --include-untracked -m auto-stash'));
-  } catch {
-   parts.push('(nothing to stash)');
+    const parts = [];
+    try {
+      parts.push(run('git stash push --include-untracked -m auto-stash'));
+    } catch {
+      parts.push('(nothing to stash)');
+    }
+
+    const pullOut = run('git pull');
+    parts.push(pullOut);
+
+    if (pullOut.includes('Already up to date')) {
+      try {
+        parts.push(run('git stash pop'));
+      } catch {
+        parts.push('(nothing to restore)');
+      }
+      return await c.reply(parts.join('\n').trim());
+    }
+
+    parts.push(run('bun install'));
+    try {
+      parts.push(run('git stash pop'));
+    } catch {
+      parts.push('(nothing to restore)');
+    }
+
+    await c.reply(parts.join('\n').trim());
+    process.exit(0);
+  } catch (e) {
+    await c.reply(`Update failed: ${e.message}`);
   }
-
-  const pullOut = run('git pull');
-  parts.push(pullOut);
-
-  if (pullOut.includes('Already up to date')) {
-   try {
-    parts.push(run('git stash pop'));
-   } catch {
-    parts.push('(nothing to restore)');
-   }
-   return await c.reply(parts.join('\n').trim());
-  }
-
-  parts.push(run('bun install'));
-  try {
-   parts.push(run('git stash pop'));
-  } catch {
-   parts.push('(nothing to restore)');
-  }
-
-  await c.reply(parts.join('\n').trim());
-  process.exit(0);
- } catch (e) {
-  await c.reply(`Update failed: ${e.message}`);
- }
 }
 
 export default [
- {
-  cmd: ['update', 'up'],
-  cat: 'system',
-  desc: 'Git pull and restart',
-  roles: [Role.OWNER],
-  exec: update,
- },
- {
-  roles: [Role.OWNER],
-  data: new SlashCommandBuilder()
-   .setName('update')
-   .setDescription('Git pull and restart')
-   .setIntegrationTypes(ApplicationIntegrationType.GuildInstall, ApplicationIntegrationType.UserInstall)
-   .setContexts(InteractionContextType.Guild, InteractionContextType.BotDM, InteractionContextType.PrivateChannel),
-  exec: update,
- },
+  {
+    cmd: ['update', 'up'],
+    cat: 'system',
+    desc: 'Git pull and restart',
+    roles: [Role.OWNER],
+    exec: update,
+  },
+  {
+    roles: [Role.OWNER],
+    data: new SlashCommandBuilder()
+      .setName('update')
+      .setDescription('Git pull and restart')
+      .setIntegrationTypes(ApplicationIntegrationType.GuildInstall, ApplicationIntegrationType.UserInstall)
+      .setContexts(InteractionContextType.Guild, InteractionContextType.BotDM, InteractionContextType.PrivateChannel),
+    exec: update,
+  },
 ];

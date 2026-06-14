@@ -11,16 +11,16 @@
 import { Role } from '#mushi';
 
 export default {
- roles: [Role.USER],
- exec: async (c) => {
-  const message = c.event;
-  if (!message?.author) return;
-  const userManager = c.handler().userManager;
-  const user = userManager.getUser(message.author.id);
-  if (!user) return;
-  const stats = user.stats || {};
-  const type = message.guild ? 'GuildMessage' : 'DirectMessage';
-  stats[type] = (stats[type] || 0) + 1;
-  userManager.updateUser(message.author.id, { stats });
- },
+  roles: [Role.USER],
+  exec: async (c) => {
+    const message = c.event;
+    if (!message?.author) return;
+    const userManager = c.handler().userManager;
+    const user = userManager.getUser(message.author.id);
+    if (!user) return;
+    const stats = user.stats || {};
+    const type = message.guild ? 'GuildMessage' : 'DirectMessage';
+    stats[type] = (stats[type] || 0) + 1;
+    userManager.updateUser(message.author.id, { stats });
+  },
 };

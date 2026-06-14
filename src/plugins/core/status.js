@@ -12,26 +12,26 @@ import { ApplicationIntegrationType, InteractionContextType, SlashCommandBuilder
 import { Role } from '#mushi';
 
 async function status(c) {
- const m = c.event ?? c;
+  const m = c.event ?? c;
 
- const uptime = process.uptime();
- const memory = process.memoryUsage().rss / 1024 / 1024;
- await m.reply(`Uptime: ${uptime.toFixed(2)}s\nMemory: ${memory.toFixed(2)}MB`);
+  const uptime = process.uptime();
+  const memory = process.memoryUsage().rss / 1024 / 1024;
+  await m.reply(`Uptime: ${uptime.toFixed(2)}s\nMemory: ${memory.toFixed(2)}MB`);
 }
 
 export default [
- {
-  cmd: 'status',
-  roles: [Role.USER],
-  exec: status,
- },
- {
-  roles: [Role.USER],
-  data: new SlashCommandBuilder()
-   .setName('status')
-   .setDescription('Get bot status')
-   .setIntegrationTypes(ApplicationIntegrationType.GuildInstall, ApplicationIntegrationType.UserInstall)
-   .setContexts(InteractionContextType.Guild, InteractionContextType.BotDM, InteractionContextType.PrivateChannel),
-  exec: status,
- },
+  {
+    cmd: 'status',
+    roles: [Role.USER],
+    exec: status,
+  },
+  {
+    roles: [Role.USER],
+    data: new SlashCommandBuilder()
+      .setName('status')
+      .setDescription('Get bot status')
+      .setIntegrationTypes(ApplicationIntegrationType.GuildInstall, ApplicationIntegrationType.UserInstall)
+      .setContexts(InteractionContextType.Guild, InteractionContextType.BotDM, InteractionContextType.PrivateChannel),
+    exec: status,
+  },
 ];

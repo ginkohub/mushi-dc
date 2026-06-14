@@ -25,7 +25,7 @@
 		"enabled": true,
 		"formatWithErrors": false,
 		"indentStyle": "space",
-		"indentWidth": 1,
+		"indentWidth": 2,
 		"lineEnding": "lf",
 		"lineWidth": 120
 	},

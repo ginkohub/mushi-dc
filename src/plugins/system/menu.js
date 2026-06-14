@@ -12,58 +12,58 @@ import { ApplicationIntegrationType, InteractionContextType, SlashCommandBuilder
 import { Role, translate } from '#mushi';
 
 const t = translate({
- en: {
-  header: '--- MUSHI MENU ---',
-  footer: 'Use {prefix}command for details',
-  category: 'Category',
-  total: 'Total Commands',
- },
- id: {
-  header: '--- MENU MUSHI ---',
-  footer: 'Gunakan {prefix}command untuk detail',
-  category: 'Kategori',
-  total: 'Total Perintah',
- },
+  en: {
+    header: '--- MUSHI MENU ---',
+    footer: 'Use {prefix}command for details',
+    category: 'Category',
+    total: 'Total Commands',
+  },
+  id: {
+    header: '--- MENU MUSHI ---',
+    footer: 'Gunakan {prefix}command untuk detail',
+    category: 'Kategori',
+    total: 'Total Perintah',
+  },
 });
 
 async function showMenu(c) {
- const handler = c.handler();
- const categories = {};
- const prefix = c.prefix;
+  const handler = c.handler();
+  const categories = {};
+  const prefix = c.prefix;
 
- for (const [_id, plugin] of handler.plugins) {
-  if (!plugin.cmd || plugin.hidden) continue;
-  const cat = plugin.cat || 'uncategorized';
-  if (!categories[cat]) categories[cat] = [];
-  categories[cat].push(plugin.cmd[0]);
- }
+  for (const [_id, plugin] of handler.plugins) {
+    if (!plugin.cmd || plugin.hidden) continue;
+    const cat = plugin.cat || 'uncategorized';
+    if (!categories[cat]) categories[cat] = [];
+    categories[cat].push(plugin.cmd[0]);
+  }
 
- const menu = [t('header', {}, c), ''];
- for (const [cat, cmds] of Object.entries(categories)) {
-  menu.push(`[ ${cat.toUpperCase()} ]`);
-  menu.push(`> ${cmds.map((cmd) => `\`${cmd}\``).join(', ')}`);
-  menu.push('');
- }
+  const menu = [t('header', {}, c), ''];
+  for (const [cat, cmds] of Object.entries(categories)) {
+    menu.push(`[ ${cat.toUpperCase()} ]`);
+    menu.push(`> ${cmds.map((cmd) => `\`${cmd}\``).join(', ')}`);
+    menu.push('');
+  }
 
- menu.push(`${t('total', {}, c)}: ${handler.plugins.size}`);
- menu.push(t('footer', { prefix }, c));
- await c.reply(menu.join('\n').trim());
+  menu.push(`${t('total', {}, c)}: ${handler.plugins.size}`);
+  menu.push(t('footer', { prefix }, c));
+  await c.reply(menu.join('\n').trim());
 }
 
 export default [
- {
-  cmd: ['menu', 'help', 'h'],
-  cat: 'system',
-  desc: 'Show all available commands',
-  roles: [Role.USER],
-  exec: showMenu,
- },
- {
-  data: new SlashCommandBuilder()
-   .setName('menu')
-   .setDescription('Show all available commands')
-   .setIntegrationTypes(ApplicationIntegrationType.GuildInstall, ApplicationIntegrationType.UserInstall)
-   .setContexts(InteractionContextType.Guild, InteractionContextType.BotDM, InteractionContextType.PrivateChannel),
-  exec: showMenu,
- },
+  {
+    cmd: ['menu', 'help', 'h'],
+    cat: 'system',
+    desc: 'Show all available commands',
+    roles: [Role.USER],
+    exec: showMenu,
+  },
+  {
+    data: new SlashCommandBuilder()
+      .setName('menu')
+      .setDescription('Show all available commands')
+      .setIntegrationTypes(ApplicationIntegrationType.GuildInstall, ApplicationIntegrationType.UserInstall)
+      .setContexts(InteractionContextType.Guild, InteractionContextType.BotDM, InteractionContextType.PrivateChannel),
+    exec: showMenu,
+  },
 ];

@@ -16,36 +16,36 @@ import pen from './pen.js';
 import { Role } from './plugin.js';
 
 try {
- pen.Info('Loading.env file');
- dotenv.config();
+  pen.Info('Loading.env file');
+  dotenv.config();
 } catch {
- pen.Warn('No .env file found');
- pen.Warn('Please check and edit .env file');
- writeFileSync(
-  '.env',
-  'DISCORD_TOKEN=<your_token>\nDISCORD_CLIENT_ID=<your_client_id>\n# DISCORD_GUILD_ID=<your_guild_id>',
- );
+  pen.Warn('No .env file found');
+  pen.Warn('Please check and edit .env file');
+  writeFileSync(
+    '.env',
+    'DISCORD_TOKEN=<your_token>\nDISCORD_CLIENT_ID=<your_client_id>\n# DISCORD_GUILD_ID=<your_guild_id>',
+  );
 }
 
 const client = new Client({
- intents: [
-  GatewayIntentBits.Guilds,
-  GatewayIntentBits.GuildMessages,
-  GatewayIntentBits.MessageContent,
-  GatewayIntentBits.DirectMessages,
- ],
- partials: [Partials.Channel, Partials.Message],
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
+    GatewayIntentBits.DirectMessages,
+  ],
+  partials: [Partials.Channel, Partials.Message],
 });
 
 handler.attach(client);
 
 const ownerIds = (process.env.OWNER_IDS || '').split(/[,; ]+/).filter(Boolean);
 for (const id of ownerIds) {
- const user = handler.userManager.updateUser(id, {});
- if (!user.roles.includes(Role.OWNER)) {
-  user.roles.push(Role.OWNER);
-  handler.userManager.updateUser(id, { roles: user.roles });
- }
+  const user = handler.userManager.updateUser(id, {});
+  if (!user.roles.includes(Role.OWNER)) {
+    user.roles.push(Role.OWNER);
+    handler.userManager.updateUser(id, { roles: user.roles });
+  }
 }
 if (ownerIds.length > 0) pen.Info(`Auto-added ${ownerIds.length} owner(s) from OWNER_IDS`);
 

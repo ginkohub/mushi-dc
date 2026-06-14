@@ -12,64 +12,64 @@ import { ApplicationIntegrationType, InteractionContextType, SlashCommandBuilder
 import { Role } from '#mushi';
 
 async function blockUser(c) {
- const target = c.isSlash
-  ? await c
-     .client()
-     .users.fetch(c.argv.user)
-     .catch(() => null)
-  : c.event.mentions?.users?.first();
- if (!target) return await c.reply('Specify a user to block.');
- await c.handler().updateBlock(target.id, 'block');
- c.handler().userManager.updateUser(target.id, { banned: true, bannedAt: new Date().toISOString() });
- await c.reply(`Blocked ${target.username}.`);
+  const target = c.isSlash
+    ? await c
+        .client()
+        .users.fetch(c.argv.user)
+        .catch(() => null)
+    : c.event.mentions?.users?.first();
+  if (!target) return await c.reply('Specify a user to block.');
+  await c.handler().updateBlock(target.id, 'block');
+  c.handler().userManager.updateUser(target.id, { banned: true, bannedAt: new Date().toISOString() });
+  await c.reply(`Blocked ${target.username}.`);
 }
 
 async function unblockUser(c) {
- const target = c.isSlash
-  ? await c
-     .client()
-     .users.fetch(c.argv.user)
-     .catch(() => null)
-  : c.event.mentions?.users?.first();
- if (!target) return await c.reply('Specify a user to unblock.');
- await c.handler().updateBlock(target.id, 'unblock');
- c.handler().userManager.updateUser(target.id, { banned: false, bannedAt: null });
- await c.reply(`Unblocked ${target.username}.`);
+  const target = c.isSlash
+    ? await c
+        .client()
+        .users.fetch(c.argv.user)
+        .catch(() => null)
+    : c.event.mentions?.users?.first();
+  if (!target) return await c.reply('Specify a user to unblock.');
+  await c.handler().updateBlock(target.id, 'unblock');
+  c.handler().userManager.updateUser(target.id, { banned: false, bannedAt: null });
+  await c.reply(`Unblocked ${target.username}.`);
 }
 
 export default [
- {
-  cmd: ['block', 'b'],
-  cat: 'admin',
-  desc: 'Block a user',
-  roles: [Role.ADMIN],
-  exec: blockUser,
- },
- {
-  cmd: ['unblock', 'ub'],
-  cat: 'admin',
-  desc: 'Unblock a user',
-  roles: [Role.ADMIN],
-  exec: unblockUser,
- },
- {
-  roles: [Role.ADMIN],
-  data: new SlashCommandBuilder()
-   .setName('block')
-   .setDescription('Block a user')
-   .addUserOption((o) => o.setName('user').setDescription('User to block').setRequired(true))
-   .setIntegrationTypes(ApplicationIntegrationType.GuildInstall, ApplicationIntegrationType.UserInstall)
-   .setContexts(InteractionContextType.Guild, InteractionContextType.BotDM, InteractionContextType.PrivateChannel),
-  exec: blockUser,
- },
- {
-  roles: [Role.ADMIN],
-  data: new SlashCommandBuilder()
-   .setName('unblock')
-   .setDescription('Unblock a user')
-   .addUserOption((o) => o.setName('user').setDescription('User to unblock').setRequired(true))
-   .setIntegrationTypes(ApplicationIntegrationType.GuildInstall, ApplicationIntegrationType.UserInstall)
-   .setContexts(InteractionContextType.Guild, InteractionContextType.BotDM, InteractionContextType.PrivateChannel),
-  exec: unblockUser,
- },
+  {
+    cmd: ['block', 'b'],
+    cat: 'admin',
+    desc: 'Block a user',
+    roles: [Role.ADMIN],
+    exec: blockUser,
+  },
+  {
+    cmd: ['unblock', 'ub'],
+    cat: 'admin',
+    desc: 'Unblock a user',
+    roles: [Role.ADMIN],
+    exec: unblockUser,
+  },
+  {
+    roles: [Role.ADMIN],
+    data: new SlashCommandBuilder()
+      .setName('block')
+      .setDescription('Block a user')
+      .addUserOption((o) => o.setName('user').setDescription('User to block').setRequired(true))
+      .setIntegrationTypes(ApplicationIntegrationType.GuildInstall, ApplicationIntegrationType.UserInstall)
+      .setContexts(InteractionContextType.Guild, InteractionContextType.BotDM, InteractionContextType.PrivateChannel),
+    exec: blockUser,
+  },
+  {
+    roles: [Role.ADMIN],
+    data: new SlashCommandBuilder()
+      .setName('unblock')
+      .setDescription('Unblock a user')
+      .addUserOption((o) => o.setName('user').setDescription('User to unblock').setRequired(true))
+      .setIntegrationTypes(ApplicationIntegrationType.GuildInstall, ApplicationIntegrationType.UserInstall)
+      .setContexts(InteractionContextType.Guild, InteractionContextType.BotDM, InteractionContextType.PrivateChannel),
+    exec: unblockUser,
+  },
 ];
