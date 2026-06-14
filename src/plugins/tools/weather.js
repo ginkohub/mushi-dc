@@ -11,6 +11,8 @@
 import { ApplicationIntegrationType, InteractionContextType, SlashCommandBuilder } from 'discord.js';
 import { getWeather, pen, Role, translate } from '#mushi';
 
+const GEO_API = 'https://geocoding-api.open-meteo.com/v1/search';
+
 const t = translate({
  en: {
   help_title: 'WEATHER INFO',
@@ -37,6 +39,22 @@ const t = translate({
   footer: '_Data: Open-Meteo_',
  },
 });
+
+async function autoCity(m) {
+ const query = m.options.getFocused();
+ if (!query || query.length < 2) return await m.respond([]);
+ try {
+  const res = await fetch(`${GEO_API}?name=${encodeURIComponent(query)}&count=5&language=en&format=json`);
+  const data = await res.json();
+  const choices = (data.results || []).map((r) => ({
+   name: `${r.name}${r.country ? `, ${r.country}` : ''}${r.admin1 ? ` (${r.admin1})` : ''}`,
+   value: r.name,
+  }));
+  await m.respond(choices);
+ } catch {
+  await m.respond([]);
+ }
+}
 
 async function weather(c) {
  const query = c.isSlash ? c.event.options.getString('city') || '' : (c.args || '').trim();
@@ -74,10 +92,11 @@ export default [
  },
  {
   roles: [Role.USER],
+  autocomplete: autoCity,
   data: new SlashCommandBuilder()
    .setName('weather')
    .setDescription('Check current weather for a city')
-   .addStringOption((o) => o.setName('city').setDescription('City name').setRequired(true))
+   .addStringOption((o) => o.setName('city').setDescription('City name').setRequired(true).setAutocomplete(true))
    .setIntegrationTypes(ApplicationIntegrationType.GuildInstall, ApplicationIntegrationType.UserInstall)
    .setContexts(InteractionContextType.Guild, InteractionContextType.BotDM, InteractionContextType.PrivateChannel),
   exec: weather,
