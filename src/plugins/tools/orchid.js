@@ -25,7 +25,7 @@ async function orchid(c) {
   try {
     const res = await fetch(
       `https://api.crossref.org/works?query=${encodeURIComponent(query)}&rows=${maxRows}&sort=relevance`,
-      { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:137.0) Gecko/20100101 Firefox/137.0' },
+      { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:137.0) Gecko/20100101 Firefox/137.0' } },
     );
     if (!res.ok) return await c.reply('Search failed.');
     const data = await res.json();
