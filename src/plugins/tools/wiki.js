@@ -9,7 +9,7 @@
  */
 
 import { ApplicationIntegrationType, InteractionContextType, SlashCommandBuilder } from 'discord.js';
-import { Role, searchWiki } from '#mushi';
+import { pen, Role, searchWiki } from '#mushi';
 
 const WIKI_API = 'https://en.wikipedia.org/w/api.php';
 
@@ -23,7 +23,8 @@ async function autoQuery(m) {
     const data = await res.json();
     const choices = (data.query?.search || []).map((p) => ({ name: p.title.slice(0, 100), value: p.title }));
     await m.respond(choices);
-  } catch {
+  } catch (e) {
+    pen.Error('wiki-autocomplete', e);
     await m.respond([]);
   }
 }
