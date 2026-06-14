@@ -11,21 +11,28 @@
 import { ApplicationIntegrationType, InteractionContextType, SlashCommandBuilder } from 'discord.js';
 import { Role, searchWiki } from '#mushi';
 
-async function wiki(c) {
-  let query;
-  let lang;
-  if (c.isSlash) {
-    query = c.event.options.getString('query') || '';
-    lang = c.event.options.getString('lang') || 'en';
-  } else {
-    const args = (c.args || '').trim();
-    const langMatch = args.match(/(?:^|\s)(?:-l|--lang)\s+(\w+)(?:\s|$)/);
-    lang = langMatch?.[1] || 'en';
-    query = args.replace(/(?:^|\s)(?:-l|--lang)\s+\w+(?:\s|$)/, '').trim();
+const WIKI_API = 'https://en.wikipedia.org/w/api.php';
+
+async function autoQuery(m) {
+  const query = m.options.getFocused();
+  if (!query || query.length < 2) return await m.respond([]);
+  try {
+    const res = await fetch(
+      `${WIKI_API}?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&srlimit=10`,
+    );
+    const data = await res.json();
+    const choices = (data.query?.search || []).map((p) => ({ name: p.title.slice(0, 100), value: p.title }));
+    await m.respond(choices);
+  } catch {
+    await m.respond([]);
   }
+}
+
+async function wiki(c) {
+  const query = c.isSlash ? c.event.options.getString('query') || '' : (c.args || '').trim();
   if (!query) return await c.react('❌');
   try {
-    const result = await searchWiki(query, lang);
+    const result = await searchWiki(query);
     if (!result) return await c.reply('Not found.');
     const reply = `**${result.title}**\n${(result.text || '').slice(0, 1900)}\n${result.url}`;
     await c.reply(reply);
@@ -44,11 +51,11 @@ export default [
   },
   {
     roles: [Role.USER],
+    autocomplete: autoQuery,
     data: new SlashCommandBuilder()
       .setName('wiki')
       .setDescription('Search Wikipedia for a topic')
-      .addStringOption((o) => o.setName('query').setDescription('Search query').setRequired(true))
-      .addStringOption((o) => o.setName('lang').setDescription('Language code (e.g. en, id, ja)'))
+      .addStringOption((o) => o.setName('query').setDescription('Search query').setRequired(true).setAutocomplete(true))
       .setIntegrationTypes(ApplicationIntegrationType.GuildInstall, ApplicationIntegrationType.UserInstall)
       .setContexts(InteractionContextType.Guild, InteractionContextType.BotDM, InteractionContextType.PrivateChannel),
     exec: wiki,
