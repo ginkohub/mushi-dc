@@ -584,6 +584,11 @@ export class Handler {
 							/* Check rules and midware before exec */
 							const reason = await plugin?.check(ctx);
 							if (!reason?.success) {
+								try {
+									await ctx.reply({ content: reason.message, flags: MessageFlags.Ephemeral });
+								} catch {
+									/* ignore */
+								}
 								if (plugin?.final) await plugin.final(ctx, reason);
 								return;
 							}

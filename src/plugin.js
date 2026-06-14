@@ -144,10 +144,11 @@ export class Plugin {
 			message: 'This plugin is ready to execute',
 		});
 
-		if (this.roles && Array.isArray(this.roles)) {
-			const permissed = ctx.roles?.some((role) => this.roles.includes(role));
+		if (this.roles && Array.isArray(this.roles) && !ctx.fromMe) {
+			const min = Math.min(...this.roles);
+			const max = Math.max(...(ctx.roles || []));
 
-			if (!permissed) {
+			if (max < min) {
 				return res.setSuccess(false).setCode('plugin-role-insufficient').setMessage("User don't have the required role");
 			}
 		}

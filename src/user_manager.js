@@ -18,7 +18,7 @@ export class User {
 		this.displayName = data.displayName ?? null;
 		this.roles = data.roles ?? [Role.USER];
 		this.roles = this.roles.map((r) => {
-			if (r <= 4) return [0, 1, 10, 100, 1000, 10000][r] ?? r;
+			if (r <= 4) return [1, 10, 100, 1000, 10000][r] ?? r;
 			return r;
 		});
 		this.level = data.level ?? 1;
