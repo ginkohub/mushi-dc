@@ -22,6 +22,94 @@ const t = translate({
   },
 });
 
+const LANGUAGES = [
+  { name: 'Afrikaans', value: 'af' },
+  { name: 'Albanian', value: 'sq' },
+  { name: 'Arabic', value: 'ar' },
+  { name: 'Armenian', value: 'hy' },
+  { name: 'Azerbaijani', value: 'az' },
+  { name: 'Basque', value: 'eu' },
+  { name: 'Belarusian', value: 'be' },
+  { name: 'Bengali', value: 'bn' },
+  { name: 'Bosnian', value: 'bs' },
+  { name: 'Bulgarian', value: 'bg' },
+  { name: 'Catalan', value: 'ca' },
+  { name: 'Cebuano', value: 'ceb' },
+  { name: 'Chinese (Simplified)', value: 'zh-CN' },
+  { name: 'Chinese (Traditional)', value: 'zh-TW' },
+  { name: 'Croatian', value: 'hr' },
+  { name: 'Czech', value: 'cs' },
+  { name: 'Danish', value: 'da' },
+  { name: 'Dutch', value: 'nl' },
+  { name: 'English', value: 'en' },
+  { name: 'Esperanto', value: 'eo' },
+  { name: 'Estonian', value: 'et' },
+  { name: 'Finnish', value: 'fi' },
+  { name: 'French', value: 'fr' },
+  { name: 'Galician', value: 'gl' },
+  { name: 'Georgian', value: 'ka' },
+  { name: 'German', value: 'de' },
+  { name: 'Greek', value: 'el' },
+  { name: 'Gujarati', value: 'gu' },
+  { name: 'Haitian Creole', value: 'ht' },
+  { name: 'Hebrew', value: 'iw' },
+  { name: 'Hindi', value: 'hi' },
+  { name: 'Hungarian', value: 'hu' },
+  { name: 'Icelandic', value: 'is' },
+  { name: 'Indonesian', value: 'id' },
+  { name: 'Irish', value: 'ga' },
+  { name: 'Italian', value: 'it' },
+  { name: 'Japanese', value: 'ja' },
+  { name: 'Kannada', value: 'kn' },
+  { name: 'Kazakh', value: 'kk' },
+  { name: 'Korean', value: 'ko' },
+  { name: 'Kurdish', value: 'ku' },
+  { name: 'Lao', value: 'lo' },
+  { name: 'Latin', value: 'la' },
+  { name: 'Latvian', value: 'lv' },
+  { name: 'Lithuanian', value: 'lt' },
+  { name: 'Macedonian', value: 'mk' },
+  { name: 'Malay', value: 'ms' },
+  { name: 'Malayalam', value: 'ml' },
+  { name: 'Maltese', value: 'mt' },
+  { name: 'Marathi', value: 'mr' },
+  { name: 'Mongolian', value: 'mn' },
+  { name: 'Nepali', value: 'ne' },
+  { name: 'Norwegian', value: 'no' },
+  { name: 'Persian', value: 'fa' },
+  { name: 'Polish', value: 'pl' },
+  { name: 'Portuguese', value: 'pt' },
+  { name: 'Punjabi', value: 'pa' },
+  { name: 'Romanian', value: 'ro' },
+  { name: 'Russian', value: 'ru' },
+  { name: 'Serbian', value: 'sr' },
+  { name: 'Sinhala', value: 'si' },
+  { name: 'Slovak', value: 'sk' },
+  { name: 'Slovenian', value: 'sl' },
+  { name: 'Spanish', value: 'es' },
+  { name: 'Sundanese', value: 'su' },
+  { name: 'Swahili', value: 'sw' },
+  { name: 'Swedish', value: 'sv' },
+  { name: 'Tamil', value: 'ta' },
+  { name: 'Telugu', value: 'te' },
+  { name: 'Thai', value: 'th' },
+  { name: 'Turkish', value: 'tr' },
+  { name: 'Ukrainian', value: 'uk' },
+  { name: 'Urdu', value: 'ur' },
+  { name: 'Vietnamese', value: 'vi' },
+  { name: 'Welsh', value: 'cy' },
+  { name: 'Yiddish', value: 'yi' },
+];
+
+async function autoLang(m) {
+  const query = m.options.getFocused().toLowerCase();
+  if (!query) return await m.respond(LANGUAGES.slice(0, 25));
+  const filtered = LANGUAGES.filter(
+    (l) => l.name.toLowerCase().includes(query) || l.value.toLowerCase().includes(query),
+  ).slice(0, 25);
+  await m.respond(filtered);
+}
+
 export default [
   {
     cmd: ['tr', 'translate'],
@@ -105,7 +193,7 @@ export default [
         if (channel) {
           await channel.send(`**${msg.author.username}**: ${translated}`);
         }
-      } catch {}
+      } catch { }
     },
   },
   {
@@ -117,7 +205,9 @@ export default [
           .setName('text')
           .setDescription('Translate text')
           .addStringOption((o) => o.setName('text').setDescription('Text to translate').setRequired(true))
-          .addStringOption((o) => o.setName('target').setDescription('Target language code (e.g. en, id)'))
+          .addStringOption((o) =>
+            o.setName('target').setDescription('Target language code (e.g. en, id)').setAutocomplete(true),
+          )
           .addStringOption((o) =>
             o
               .setName('engine')
@@ -129,11 +219,14 @@ export default [
         s
           .setName('auto')
           .setDescription("Auto-translate a user's messages")
-          .addStringOption((o) => o.setName('target').setDescription('Target language code').setRequired(true))
+          .addStringOption((o) =>
+            o.setName('target').setDescription('Target language code').setRequired(true).setAutocomplete(true),
+          )
           .addStringOption((o) => o.setName('user').setDescription('Username to auto-translate').setRequired(true)),
       )
       .setIntegrationTypes(ApplicationIntegrationType.GuildInstall, ApplicationIntegrationType.UserInstall)
       .setContexts(InteractionContextType.Guild, InteractionContextType.BotDM, InteractionContextType.PrivateChannel),
+    autocomplete: autoLang,
     exec: async (c) => {
       const sub = c.event.options.getSubcommand();
       if (sub === 'text') {
