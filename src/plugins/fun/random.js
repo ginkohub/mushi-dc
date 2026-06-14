@@ -84,64 +84,72 @@ typeCommand.addStringOption((o) =>
   .addChoices(...TYPE_CHOICES.map(([v, d]) => ({ name: d, value: v }))),
 );
 
-export default {
- cmd: ['random', 'rand'],
- cat: 'fun',
- desc: 'Random content (anime quote, images, etc.)',
- roles: [Role.USER],
- data: typeCommand,
- exec: async (c) => {
-  const args = c.isSlash ? c.event.options.getString('type') || '' : (c.args || '').trim().toLowerCase();
-  if (!args || args === '?') {
-   return await c.reply([t('help_title', {}, c), '', t('help_usage', {}, c), t('help_list', {}, c)].join('\n'));
-  }
+async function random(c) {
+ const args = c.isSlash ? c.event.options.getString('type') || '' : (c.args || '').trim().toLowerCase();
+ if (!args || args === '?') {
+  return await c.reply([t('help_title', {}, c), '', t('help_usage', {}, c), t('help_list', {}, c)].join('\n'));
+ }
 
-  let sub = args.split(/\s+/)[0];
-  const aliasMap = { aq: 'animequote', ba: 'bluearchive' };
-  sub = aliasMap[sub] || sub;
+ let sub = args.split(/\s+/)[0];
+ const aliasMap = { aq: 'animequote', ba: 'bluearchive' };
+ sub = aliasMap[sub] || sub;
 
-  const sc = SUBCOMMANDS[sub];
-  if (!sc) return await c.reply(t('not_found', { cmd: args }, c));
+ const sc = SUBCOMMANDS[sub];
+ if (!sc) return await c.reply(t('not_found', { cmd: args }, c));
 
-  await c.react('⏳');
+ await c.react('⏳');
 
-  try {
-   const res = await fetch(`${API_BASE}${sc.endpoint}`, { headers: { 'User-Agent': 'MushiBot/1.0' } });
-   if (!res.ok) {
-    await c.react('❌');
-    return;
-   }
-
-   if (IMAGE_ENDPOINTS.has(sub)) {
-    return await c.reply({ files: [`${API_BASE}${sc.endpoint}`] });
-   }
-
-   const data = await res.json();
-   if (!data?.status) {
-    await c.react('❌');
-    return;
-   }
-
-   const items = data.data;
-   if (!Array.isArray(items) || items.length === 0) {
-    await c.react('❌');
-    return;
-   }
-
-   const item = items[Math.floor(Math.random() * items.length)];
-
-   if (sub === 'animequote') {
-    return await c.reply(t('quote', { quote: item.quotes, character: item.karakter, anime: item.anime }, c));
-   }
-   if (sub === 'lahelu') {
-    const url = `https://lahelu.com/post/${item.postId}`;
-    return await c.reply(`**${item.title}**\n👍 ${item.totalUpvotes}  💬 ${item.totalComments}\n${url}`);
-   }
-
-   await c.reply(JSON.stringify(item, null, 2).slice(0, 1900));
-  } catch (e) {
-   pen.Error(`random-error: ${e.message}`);
+ try {
+  const res = await fetch(`${API_BASE}${sc.endpoint}`, { headers: { 'User-Agent': 'MushiBot/1.0' } });
+  if (!res.ok) {
    await c.react('❌');
+   return;
   }
+
+  if (IMAGE_ENDPOINTS.has(sub)) {
+   return await c.reply({ files: [`${API_BASE}${sc.endpoint}`] });
+  }
+
+  const data = await res.json();
+  if (!data?.status) {
+   await c.react('❌');
+   return;
+  }
+
+  const items = data.data;
+  if (!Array.isArray(items) || items.length === 0) {
+   await c.react('❌');
+   return;
+  }
+
+  const item = items[Math.floor(Math.random() * items.length)];
+
+  if (sub === 'animequote') {
+   return await c.reply(t('quote', { quote: item.quotes, character: item.karakter, anime: item.anime }, c));
+  }
+  if (sub === 'lahelu') {
+   const url = `https://lahelu.com/post/${item.postId}`;
+   return await c.reply(`**${item.title}**\n👍 ${item.totalUpvotes}  💬 ${item.totalComments}\n${url}`);
+  }
+
+  await c.reply(JSON.stringify(item, null, 2).slice(0, 1900));
+ } catch (e) {
+  pen.Error(`random-error: ${e.message}`);
+  await c.react('❌');
+ }
+}
+
+export default [
+ {
+  cmd: ['random', 'rand'],
+  cat: 'fun',
+  desc: 'Random content (anime quote, images, etc.)',
+  roles: [Role.USER],
+  exec: random,
  },
-};
+ {
+  roles: [Role.USER],
+  data: typeCommand,
+  exec: random,
+ },
+];

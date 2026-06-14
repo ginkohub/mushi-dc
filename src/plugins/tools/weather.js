@@ -38,40 +38,48 @@ const t = translate({
  },
 });
 
-export default {
- cmd: ['weather', 'cuaca'],
- cat: 'tools',
- desc: 'Check current weather for a city',
- roles: [Role.USER],
- data: new SlashCommandBuilder()
-  .setName('weather')
-  .setDescription('Check current weather for a city')
-  .addStringOption((o) => o.setName('city').setDescription('City name').setRequired(true))
-  .setIntegrationTypes(ApplicationIntegrationType.GuildInstall, ApplicationIntegrationType.UserInstall)
-  .setContexts(InteractionContextType.Guild, InteractionContextType.BotDM, InteractionContextType.PrivateChannel),
- exec: async (c) => {
-  const query = c.isSlash ? c.event.options.getString('city') || '' : (c.args || '').trim();
-  if (!query || query === '?') {
-   return await c.reply([t('help_title', {}, c), '', t('help_usage', {}, c)].join('\n'));
-  }
-  try {
-   const result = await getWeather(query);
-   if (!result) return await c.reply(t('not_found', { query }, c));
-   await c.reply(
-    [
-     t('header', { location: result.location }, c),
-     '',
-     t('temp', { temp: result.temp }, c),
-     t('condition', { condition: result.condition }, c),
-     t('humidity', { humidity: result.humidity }, c),
-     t('wind', { wind: result.wind }, c),
-     '',
-     t('footer', {}, c),
-    ].join('\n'),
-   );
-  } catch (e) {
-   pen.Error(`weather-error: ${e.message}`);
-   await c.reply(t('api_error', {}, c));
-  }
+async function weather(c) {
+ const query = c.isSlash ? c.event.options.getString('city') || '' : (c.args || '').trim();
+ if (!query || query === '?') {
+  return await c.reply([t('help_title', {}, c), '', t('help_usage', {}, c)].join('\n'));
+ }
+ try {
+  const result = await getWeather(query);
+  if (!result) return await c.reply(t('not_found', { query }, c));
+  await c.reply(
+   [
+    t('header', { location: result.location }, c),
+    '',
+    t('temp', { temp: result.temp }, c),
+    t('condition', { condition: result.condition }, c),
+    t('humidity', { humidity: result.humidity }, c),
+    t('wind', { wind: result.wind }, c),
+    '',
+    t('footer', {}, c),
+   ].join('\n'),
+  );
+ } catch (e) {
+  pen.Error(`weather-error: ${e.message}`);
+  await c.reply(t('api_error', {}, c));
+ }
+}
+
+export default [
+ {
+  cmd: ['weather', 'cuaca'],
+  cat: 'tools',
+  desc: 'Check current weather for a city',
+  roles: [Role.USER],
+  exec: weather,
  },
-};
+ {
+  roles: [Role.USER],
+  data: new SlashCommandBuilder()
+   .setName('weather')
+   .setDescription('Check current weather for a city')
+   .addStringOption((o) => o.setName('city').setDescription('City name').setRequired(true))
+   .setIntegrationTypes(ApplicationIntegrationType.GuildInstall, ApplicationIntegrationType.UserInstall)
+   .setContexts(InteractionContextType.Guild, InteractionContextType.BotDM, InteractionContextType.PrivateChannel),
+  exec: weather,
+ },
+];

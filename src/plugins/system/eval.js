@@ -11,29 +11,37 @@
 import { ApplicationIntegrationType, InteractionContextType, SlashCommandBuilder } from 'discord.js';
 import { Role } from '#mushi';
 
-export default {
- cmd: ['eval', '>'],
- cat: 'system',
- desc: 'Evaluate JavaScript code',
- roles: [Role.OWNER],
- data: new SlashCommandBuilder()
-  .setName('eval')
-  .setDescription('Evaluate JavaScript code')
-  .addStringOption((o) => o.setName('code').setDescription('JavaScript code to evaluate').setRequired(true))
-  .setIntegrationTypes(ApplicationIntegrationType.GuildInstall, ApplicationIntegrationType.UserInstall)
-  .setContexts(InteractionContextType.Guild, InteractionContextType.BotDM, InteractionContextType.PrivateChannel),
- exec: async (c) => {
-  const src = c.isSlash ? c.event.options.getString('code') || '' : c.args?.trim() || '';
-  if (!src) return;
+async function evalCmd(c) {
+ const src = c.isSlash ? c.event.options.getString('code') || '' : c.args?.trim() || '';
+ if (!src) return;
 
-  try {
-   /* biome-ignore lint/security/noGlobalEval: intentional eval feature */
-   let res = await eval(`(async () => { ${src} })()`);
-   if (res === undefined) return;
-   if (typeof res === 'object') res = JSON.stringify(res, null, 2);
-   await c.reply(`${res}`);
-  } catch (e) {
-   await c.reply(`${e}`);
-  }
+ try {
+  /* biome-ignore lint/security/noGlobalEval: intentional eval feature */
+  let res = await eval(`(async () => { ${src} })()`);
+  if (res === undefined) return;
+  if (typeof res === 'object') res = JSON.stringify(res, null, 2);
+  await c.reply(`${res}`);
+ } catch (e) {
+  await c.reply(`${e}`);
+ }
+}
+
+export default [
+ {
+  cmd: ['eval', '>'],
+  cat: 'system',
+  desc: 'Evaluate JavaScript code',
+  roles: [Role.OWNER],
+  exec: evalCmd,
  },
-};
+ {
+  roles: [Role.OWNER],
+  data: new SlashCommandBuilder()
+   .setName('eval')
+   .setDescription('Evaluate JavaScript code')
+   .addStringOption((o) => o.setName('code').setDescription('JavaScript code to evaluate').setRequired(true))
+   .setIntegrationTypes(ApplicationIntegrationType.GuildInstall, ApplicationIntegrationType.UserInstall)
+   .setContexts(InteractionContextType.Guild, InteractionContextType.BotDM, InteractionContextType.PrivateChannel),
+  exec: evalCmd,
+ },
+];

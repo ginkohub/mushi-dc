@@ -30,88 +30,96 @@ const t = translate({
  },
 });
 
-export default {
- cmd: ['search', 's'],
- cat: 'tools',
- desc: 'Search web, YouTube, or GSMArena',
- roles: [Role.USER],
- data: new SlashCommandBuilder()
-  .setName('search')
-  .setDescription('Search web, YouTube, or GSMArena')
-  .addSubcommand((s) =>
-   s
-    .setName('web')
-    .setDescription('Search the web')
-    .addStringOption((o) => o.setName('query').setDescription('Search query').setRequired(true)),
-  )
-  .addSubcommand((s) =>
-   s
-    .setName('yt')
-    .setDescription('Search YouTube')
-    .addStringOption((o) => o.setName('query').setDescription('Search query').setRequired(true)),
-  )
-  .addSubcommand((s) =>
-   s
-    .setName('gsm')
-    .setDescription('Search GSMArena')
-    .addStringOption((o) => o.setName('query').setDescription('Search query').setRequired(true)),
-  )
-  .setIntegrationTypes(ApplicationIntegrationType.GuildInstall, ApplicationIntegrationType.UserInstall)
-  .setContexts(InteractionContextType.Guild, InteractionContextType.BotDM, InteractionContextType.PrivateChannel),
- exec: async (c) => {
-  if (c.isSlash) {
-   const sub = c.event.options.getSubcommand();
-   const query = c.event.options.getString('query');
-   c.args = `${sub} ${query}`;
-  }
-  let args = (c.args || '').trim();
-  if (!args || args === '?') return await c.reply(t('help', {}, c));
+async function search(c) {
+ if (c.isSlash) {
+  const sub = c.event.options.getSubcommand();
+  const query = c.event.options.getString('query');
+  c.args = `${sub} ${query}`;
+ }
+ let args = (c.args || '').trim();
+ if (!args || args === '?') return await c.reply(t('help', {}, c));
 
-  const maxMatch = args.match(/(?:^|\s)-n\s+(\d+)(?:\s|$)/);
-  const limit = Math.min(Math.max(parseInt(maxMatch?.[1], 10) || 5, 1), 10);
-  args = args.replace(/(?:^|\s)-n\s+\d+(?:\s|$)/, ' ').trim();
+ const maxMatch = args.match(/(?:^|\s)-n\s+(\d+)(?:\s|$)/);
+ const limit = Math.min(Math.max(parseInt(maxMatch?.[1], 10) || 5, 1), 10);
+ args = args.replace(/(?:^|\s)-n\s+\d+(?:\s|$)/, ' ').trim();
 
-  await c.react('⏳');
+ await c.react('⏳');
 
-  try {
-   const parts = args.split(/\s+/);
-   const engine = parts[0].toLowerCase();
-   const query = parts.slice(1).join(' ');
+ try {
+  const parts = args.split(/\s+/);
+  const engine = parts[0].toLowerCase();
+  const query = parts.slice(1).join(' ');
 
-   if (engine === 'yt' && query) {
-    const res = await fetch(`${API}/youtube?query=${encodeURIComponent(query)}`, {
-     headers: { 'User-Agent': 'MushiBot/1.0' },
-    });
-    const data = await res.json();
-    if (!data?.status || !data.data?.length) return await c.reply(t('not_found', {}, c));
-    const items = data.data.slice(0, limit);
-    const lines = items.map((i) => t('yt_result', { title: i.title || i.name, url: i.url }, c));
-    return await c.reply(lines.join('\n\n'));
-   }
-
-   if (engine === 'gsm' && query) {
-    const res = await fetch(`${API}/gsmarena?query=${encodeURIComponent(query)}`, {
-     headers: { 'User-Agent': 'MushiBot/1.0' },
-    });
-    const data = await res.json();
-    if (!data?.status || !data.data?.length) return await c.reply(t('not_found', {}, c));
-    const items = data.data.slice(0, limit);
-    const lines = items.map((i) =>
-     t('gsm_result', { name: i.name, description: (i.description || '').slice(0, 200) }, c),
-    );
-    return await c.reply(lines.join('\n\n'));
-   }
-
-   const res = await fetch(`${API}/duckduckgo?query=${encodeURIComponent(args)}`, {
+  if (engine === 'yt' && query) {
+   const res = await fetch(`${API}/youtube?query=${encodeURIComponent(query)}`, {
     headers: { 'User-Agent': 'MushiBot/1.0' },
    });
    const data = await res.json();
-   if (!data?.status || !data.data?.results?.length) return await c.reply(t('not_found', {}, c));
-   const items = data.data.results.slice(0, limit);
-   const lines = items.map((i) => `[${i.title}](${i.url})\n${i.snippet}`);
-   return await c.reply(`${data.data.results.length} results found\n\n${lines.join('\n\n').slice(0, 1900)}`);
-  } catch {
-   await c.react('❌');
+   if (!data?.status || !data.data?.length) return await c.reply(t('not_found', {}, c));
+   const items = data.data.slice(0, limit);
+   const lines = items.map((i) => t('yt_result', { title: i.title || i.name, url: i.url }, c));
+   return await c.reply(lines.join('\n\n'));
   }
+
+  if (engine === 'gsm' && query) {
+   const res = await fetch(`${API}/gsmarena?query=${encodeURIComponent(query)}`, {
+    headers: { 'User-Agent': 'MushiBot/1.0' },
+   });
+   const data = await res.json();
+   if (!data?.status || !data.data?.length) return await c.reply(t('not_found', {}, c));
+   const items = data.data.slice(0, limit);
+   const lines = items.map((i) =>
+    t('gsm_result', { name: i.name, description: (i.description || '').slice(0, 200) }, c),
+   );
+   return await c.reply(lines.join('\n\n'));
+  }
+
+  const res = await fetch(`${API}/duckduckgo?query=${encodeURIComponent(args)}`, {
+   headers: { 'User-Agent': 'MushiBot/1.0' },
+  });
+  const data = await res.json();
+  if (!data?.status || !data.data?.results?.length) return await c.reply(t('not_found', {}, c));
+  const items = data.data.results.slice(0, limit);
+  const lines = items.map((i) => `[${i.title}](${i.url})\n${i.snippet}`);
+  return await c.reply(`${data.data.results.length} results found\n\n${lines.join('\n\n').slice(0, 1900)}`);
+ } catch {
+  await c.react('❌');
+ }
+}
+
+export default [
+ {
+  cmd: ['search', 's'],
+  cat: 'tools',
+  desc: 'Search web, YouTube, or GSMArena',
+  roles: [Role.USER],
+  exec: search,
  },
-};
+ {
+  roles: [Role.USER],
+  data: new SlashCommandBuilder()
+   .setName('search')
+   .setDescription('Search web, YouTube, or GSMArena')
+   .addSubcommand((s) =>
+    s
+     .setName('web')
+     .setDescription('Search the web')
+     .addStringOption((o) => o.setName('query').setDescription('Search query').setRequired(true)),
+   )
+   .addSubcommand((s) =>
+    s
+     .setName('yt')
+     .setDescription('Search YouTube')
+     .addStringOption((o) => o.setName('query').setDescription('Search query').setRequired(true)),
+   )
+   .addSubcommand((s) =>
+    s
+     .setName('gsm')
+     .setDescription('Search GSMArena')
+     .addStringOption((o) => o.setName('query').setDescription('Search query').setRequired(true)),
+   )
+   .setIntegrationTypes(ApplicationIntegrationType.GuildInstall, ApplicationIntegrationType.UserInstall)
+   .setContexts(InteractionContextType.Guild, InteractionContextType.BotDM, InteractionContextType.PrivateChannel),
+  exec: search,
+ },
+];

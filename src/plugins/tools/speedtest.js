@@ -12,43 +12,51 @@ import { SpeedTestService } from '@ginkohub/speedtest-js';
 import { ApplicationIntegrationType, InteractionContextType, SlashCommandBuilder } from 'discord.js';
 import { Role } from '#mushi';
 
-export default {
- cmd: ['speedtest', 'st'],
- cat: 'tools',
- desc: 'Run a network speed test',
- roles: [Role.USER],
- data: new SlashCommandBuilder()
-  .setName('speedtest')
-  .setDescription('Run a network speed test')
-  .setIntegrationTypes(ApplicationIntegrationType.GuildInstall, ApplicationIntegrationType.UserInstall)
-  .setContexts(InteractionContextType.Guild, InteractionContextType.BotDM, InteractionContextType.PrivateChannel),
- exec: async (c) => {
-  const msg = await c.reply('Running speedtest...');
-  if (!msg) return;
-  try {
-   const service = new SpeedTestService();
-   await service.fetchClientInfo();
-   const server = await service.findBestServer();
-   const { latency, jitter } = await service.testLatency(server);
-   let lastEdit = 0;
-   const onProgress = (label) => (s) => {
-    const now = Date.now();
-    if (now - lastEdit < 2000) return;
-    lastEdit = now;
-    msg.edit(`${label}... ${s.toFixed(2)} Mbps`).catch(() => {});
-   };
-   const dl = await service.testDownload(server, onProgress('Downloading'));
-   const ul = await service.testUpload(server, onProgress('Uploading'));
-   const result = [
-    `**Speedtest Result**`,
-    `Ping: ${latency}ms | Jitter: ${jitter.toFixed(2)}ms`,
-    `Download: ${dl.toFixed(2)} Mbps`,
-    `Upload: ${ul.toFixed(2)} Mbps`,
-    `Server: ${server.name} (${server.sponsor}, ${server.country || 'Unknown'})`,
-   ].join('\n');
-   await msg.edit(result);
-  } catch (e) {
-   await msg.edit(`Speedtest failed: ${e.message}`);
-  }
+async function speedtest(c) {
+ const msg = await c.reply('Running speedtest...');
+ if (!msg) return;
+ try {
+  const service = new SpeedTestService();
+  await service.fetchClientInfo();
+  const server = await service.findBestServer();
+  const { latency, jitter } = await service.testLatency(server);
+  let lastEdit = 0;
+  const onProgress = (label) => (s) => {
+   const now = Date.now();
+   if (now - lastEdit < 2000) return;
+   lastEdit = now;
+   msg.edit(`${label}... ${s.toFixed(2)} Mbps`).catch(() => {});
+  };
+  const dl = await service.testDownload(server, onProgress('Downloading'));
+  const ul = await service.testUpload(server, onProgress('Uploading'));
+  const result = [
+   `**Speedtest Result**`,
+   `Ping: ${latency}ms | Jitter: ${jitter.toFixed(2)}ms`,
+   `Download: ${dl.toFixed(2)} Mbps`,
+   `Upload: ${ul.toFixed(2)} Mbps`,
+   `Server: ${server.name} (${server.sponsor}, ${server.country || 'Unknown'})`,
+  ].join('\n');
+  await msg.edit(result);
+ } catch (e) {
+  await msg.edit(`Speedtest failed: ${e.message}`);
+ }
+}
+
+export default [
+ {
+  cmd: ['speedtest', 'st'],
+  cat: 'tools',
+  desc: 'Run a network speed test',
+  roles: [Role.USER],
+  exec: speedtest,
  },
-};
+ {
+  roles: [Role.USER],
+  data: new SlashCommandBuilder()
+   .setName('speedtest')
+   .setDescription('Run a network speed test')
+   .setIntegrationTypes(ApplicationIntegrationType.GuildInstall, ApplicationIntegrationType.UserInstall)
+   .setContexts(InteractionContextType.Guild, InteractionContextType.BotDM, InteractionContextType.PrivateChannel),
+  exec: speedtest,
+ },
+];
