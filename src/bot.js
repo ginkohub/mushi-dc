@@ -13,6 +13,7 @@ import { Client, GatewayIntentBits, Partials } from 'discord.js';
 import dotenv from 'dotenv';
 import { handler } from './handler.js';
 import pen from './pen.js';
+import { Role } from './plugin.js';
 
 try {
 	pen.Info('Loading.env file');
@@ -37,5 +38,15 @@ const client = new Client({
 });
 
 handler.attach(client);
+
+const ownerIds = (process.env.OWNER_IDS || '').split(/[,; ]+/).filter(Boolean);
+for (const id of ownerIds) {
+	const user = handler.userManager.updateUser(id, {});
+	if (!user.roles.includes(Role.OWNER)) {
+		user.roles.push(Role.OWNER);
+		handler.userManager.updateUser(id, { roles: user.roles });
+	}
+}
+if (ownerIds.length > 0) pen.Info(`Auto-added ${ownerIds.length} owner(s) from OWNER_IDS`);
 
 client.login(process.env.DISCORD_TOKEN);
