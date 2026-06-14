@@ -12,27 +12,27 @@ import { pen, Role, RoleMoji } from '#mushi';
 
 /** @type {import('#mushi/plugin.js').Plugin } */
 export default {
-	roles: [Role.USER],
-	exec: async (c) => {
-		const m = c.event;
+ roles: [Role.USER],
+ exec: async (c) => {
+  const m = c.event;
 
-		try {
-			const logs = [];
+  try {
+   const logs = [];
 
-			logs.push(c.sender, RoleMoji[c.roles]);
+   logs.push(c.sender, RoleMoji[c.roles]);
 
-			if (m.reference) {
-				const reply = await m.channel.messages.fetch(m.reference.messageId);
-				logs.push('>', reply.author.username);
-			}
+   if (m.reference) {
+    const reply = await m.channel.messages.fetch(m.reference.messageId);
+    logs.push('>', reply.author.username);
+   }
 
-			if (c.text) {
-				logs.push(':', c.text);
-			}
+   if (c.text) {
+    logs.push(':', c.text);
+   }
 
-			pen.Log(...logs);
-		} catch (e) {
-			pen.Error(e);
-		}
-	},
+   pen.Log(...logs);
+  } catch (e) {
+   pen.Error(e);
+  }
+ },
 };

@@ -13,154 +13,154 @@ import { ApplicationIntegrationType, InteractionContextType, SlashCommandBuilder
 import { Role } from '#mushi';
 
 function splitText(text, maxLen = 2000) {
-	if (text.length <= maxLen) return [text];
-	const splitLong = (s) => {
-		const res = [];
-		let i = 0;
-		while (i < s.length) {
-			let end = Math.min(i + maxLen, s.length);
-			if (end < s.length) {
-				const brk = s.lastIndexOf('\n', end);
-				if (brk > i) end = brk;
-			}
-			res.push(s.slice(i, end).trim());
-			i = end;
-		}
-		return res;
-	};
-	const parts = text.split(/\n\n+/);
-	const chunks = [];
-	let buf = '';
-	for (const p of parts) {
-		const next = buf ? `${buf}\n\n${p}` : p;
-		if (next.length > maxLen) {
-			if (buf) chunks.push(buf);
-			if (p.length > maxLen) chunks.push(...splitLong(p));
-			else buf = p;
-		} else {
-			buf = next;
-		}
-	}
-	if (buf) chunks.push(buf);
-	return chunks;
+ if (text.length <= maxLen) return [text];
+ const splitLong = (s) => {
+  const res = [];
+  let i = 0;
+  while (i < s.length) {
+   let end = Math.min(i + maxLen, s.length);
+   if (end < s.length) {
+    const brk = s.lastIndexOf('\n', end);
+    if (brk > i) end = brk;
+   }
+   res.push(s.slice(i, end).trim());
+   i = end;
+  }
+  return res;
+ };
+ const parts = text.split(/\n\n+/);
+ const chunks = [];
+ let buf = '';
+ for (const p of parts) {
+  const next = buf ? `${buf}\n\n${p}` : p;
+  if (next.length > maxLen) {
+   if (buf) chunks.push(buf);
+   if (p.length > maxLen) chunks.push(...splitLong(p));
+   else buf = p;
+  } else {
+   buf = next;
+  }
+ }
+ if (buf) chunks.push(buf);
+ return chunks;
 }
 
 async function readArticle(c) {
-	const url = (c.args || '').trim();
-	if (!url) return await c.react('❌');
-	await c.react('⏳');
-	try {
-		const response = await fetch(url, {
-			headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
-		});
-		const html = await response.text();
-		const $ = cheerio.load(html);
-		const title =
-			$('meta[property="og:title"]').attr('content') ||
-			$('meta[name="title"]').attr('content') ||
-			$('title').text() ||
-			'Substack Article';
-		const author = $('meta[name="author"]').attr('content') || 'Unknown';
-		let content = '';
-		const ldJson = $('script[type="application/ld+json"]').text();
-		if (ldJson) {
-			try {
-				const parsed = JSON.parse(ldJson.trim());
-				const body = parsed?.articleBody || '';
-				if (body) content = body;
-			} catch {}
-		}
-		if (!content) {
-			const bodyEl = $('[class*="body-markup"]');
-			if (bodyEl.length) content = bodyEl.html() || '';
-		}
-		if (!content) {
-			const availEl = $('[class*="available-content"]');
-			if (availEl.length) content = availEl.html() || '';
-		}
-		if (!content) {
-			content = $('meta[property="og:description"]').attr('content') || 'Could not extract article content.';
-		}
-		if (content) {
-			content = content
-				.replace(/<\/?(?:p|br|div|h[1-6]|li|blockquote|tr|dt|dd|figcaption)\b[^>]*>/gi, '\n')
-				.replace(/<[^>]*>/g, '')
-				.replace(/\n{3,}/g, '\n\n')
-				.trim();
-		}
-		const header = [`**${title}**`, author ? `By *${author}*` : null].filter(Boolean).join('\n');
-		const chunks = splitText(content, 1900);
-		for (let i = 0; i < chunks.length; i++) {
-			const msg = i === 0 ? `${header}\n\n${chunks[i]}` : chunks[i];
-			if (i === 0) await c.reply(msg);
-			else await c.send(msg);
-		}
-	} catch {
-		await c.react('❌');
-	}
+ const url = (c.args || '').trim();
+ if (!url) return await c.react('❌');
+ await c.react('⏳');
+ try {
+  const response = await fetch(url, {
+   headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+  });
+  const html = await response.text();
+  const $ = cheerio.load(html);
+  const title =
+   $('meta[property="og:title"]').attr('content') ||
+   $('meta[name="title"]').attr('content') ||
+   $('title').text() ||
+   'Substack Article';
+  const author = $('meta[name="author"]').attr('content') || 'Unknown';
+  let content = '';
+  const ldJson = $('script[type="application/ld+json"]').text();
+  if (ldJson) {
+   try {
+    const parsed = JSON.parse(ldJson.trim());
+    const body = parsed?.articleBody || '';
+    if (body) content = body;
+   } catch {}
+  }
+  if (!content) {
+   const bodyEl = $('[class*="body-markup"]');
+   if (bodyEl.length) content = bodyEl.html() || '';
+  }
+  if (!content) {
+   const availEl = $('[class*="available-content"]');
+   if (availEl.length) content = availEl.html() || '';
+  }
+  if (!content) {
+   content = $('meta[property="og:description"]').attr('content') || 'Could not extract article content.';
+  }
+  if (content) {
+   content = content
+    .replace(/<\/?(?:p|br|div|h[1-6]|li|blockquote|tr|dt|dd|figcaption)\b[^>]*>/gi, '\n')
+    .replace(/<[^>]*>/g, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+  }
+  const header = [`**${title}**`, author ? `By *${author}*` : null].filter(Boolean).join('\n');
+  const chunks = splitText(content, 1900);
+  for (let i = 0; i < chunks.length; i++) {
+   const msg = i === 0 ? `${header}\n\n${chunks[i]}` : chunks[i];
+   if (i === 0) await c.reply(msg);
+   else await c.send(msg);
+  }
+ } catch {
+  await c.react('❌');
+ }
 }
 
 async function searchPosts(c) {
-	const query = (c.args || '').trim();
-	if (!query) return await c.react('❌');
-	await c.react('⏳');
-	try {
-		const res = await fetch(
-			`https://api.siputzx.my.id/api/s/duckduckgo?query=${encodeURIComponent(`site:substack.com ${query}`)}`,
-			{ headers: { 'User-Agent': 'MushiBot/1.0' } },
-		);
-		const data = await res.json();
-		if (!data?.status || !data.data?.results?.length) return await c.reply('No results found.');
-		const items = data.data.results.slice(0, 5);
-		const lines = items.map((r, i) => `**${i + 1}.** [${r.title}](${r.url})\n${r.snippet}`);
-		await c.reply(`**Substack Search: ${query}**\n\n${lines.join('\n\n')}`.slice(0, 1900));
-	} catch {
-		await c.react('❌');
-	}
+ const query = (c.args || '').trim();
+ if (!query) return await c.react('❌');
+ await c.react('⏳');
+ try {
+  const res = await fetch(
+   `https://api.siputzx.my.id/api/s/duckduckgo?query=${encodeURIComponent(`site:substack.com ${query}`)}`,
+   { headers: { 'User-Agent': 'MushiBot/1.0' } },
+  );
+  const data = await res.json();
+  if (!data?.status || !data.data?.results?.length) return await c.reply('No results found.');
+  const items = data.data.results.slice(0, 5);
+  const lines = items.map((r, i) => `**${i + 1}.** [${r.title}](${r.url})\n${r.snippet}`);
+  await c.reply(`**Substack Search: ${query}**\n\n${lines.join('\n\n')}`.slice(0, 1900));
+ } catch {
+  await c.react('❌');
+ }
 }
 
 export default [
-	{
-		cmd: ['stack', 'stk'],
-		cat: 'tools',
-		desc: 'Read a Substack article',
-		roles: [Role.USER],
-		exec: readArticle,
-	},
-	{
-		cmd: ['stss', 'substacksearch', 'sts'],
-		cat: 'tools',
-		desc: 'Search Substack posts',
-		roles: [Role.USER],
-		exec: searchPosts,
-	},
-	{
-		data: new SlashCommandBuilder()
-			.setName('stack')
-			.setDescription('Read or search Substack articles')
-			.addSubcommand((s) =>
-				s
-					.setName('read')
-					.setDescription('Read a Substack article')
-					.addStringOption((o) => o.setName('url').setDescription('Article URL').setRequired(true)),
-			)
-			.addSubcommand((s) =>
-				s
-					.setName('search')
-					.setDescription('Search Substack posts')
-					.addStringOption((o) => o.setName('query').setDescription('Search query').setRequired(true)),
-			)
-			.setIntegrationTypes(ApplicationIntegrationType.GuildInstall, ApplicationIntegrationType.UserInstall)
-			.setContexts(InteractionContextType.Guild, InteractionContextType.BotDM, InteractionContextType.PrivateChannel),
-		exec: async (c) => {
-			const sub = c.event.options.getSubcommand();
-			if (sub === 'read') {
-				c.args = c.event.options.getString('url') || '';
-				await readArticle(c);
-			} else if (sub === 'search') {
-				c.args = c.event.options.getString('query') || '';
-				await searchPosts(c);
-			}
-		},
-	},
+ {
+  cmd: ['stack', 'stk'],
+  cat: 'tools',
+  desc: 'Read a Substack article',
+  roles: [Role.USER],
+  exec: readArticle,
+ },
+ {
+  cmd: ['stss', 'substacksearch', 'sts'],
+  cat: 'tools',
+  desc: 'Search Substack posts',
+  roles: [Role.USER],
+  exec: searchPosts,
+ },
+ {
+  data: new SlashCommandBuilder()
+   .setName('stack')
+   .setDescription('Read or search Substack articles')
+   .addSubcommand((s) =>
+    s
+     .setName('read')
+     .setDescription('Read a Substack article')
+     .addStringOption((o) => o.setName('url').setDescription('Article URL').setRequired(true)),
+   )
+   .addSubcommand((s) =>
+    s
+     .setName('search')
+     .setDescription('Search Substack posts')
+     .addStringOption((o) => o.setName('query').setDescription('Search query').setRequired(true)),
+   )
+   .setIntegrationTypes(ApplicationIntegrationType.GuildInstall, ApplicationIntegrationType.UserInstall)
+   .setContexts(InteractionContextType.Guild, InteractionContextType.BotDM, InteractionContextType.PrivateChannel),
+  exec: async (c) => {
+   const sub = c.event.options.getSubcommand();
+   if (sub === 'read') {
+    c.args = c.event.options.getString('url') || '';
+    await readArticle(c);
+   } else if (sub === 'search') {
+    c.args = c.event.options.getString('query') || '';
+    await searchPosts(c);
+   }
+  },
+ },
 ];

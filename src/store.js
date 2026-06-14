@@ -14,12 +14,12 @@ import path from 'node:path';
 const DATA_FILE = path.join(import.meta.dirname, '../data.json');
 
 export const read = () => {
-	if (!fs.existsSync(DATA_FILE)) return {};
-	const raw = fs.readFileSync(DATA_FILE, 'utf-8').trim();
-	if (!raw) return {};
-	return JSON.parse(raw);
+ if (!fs.existsSync(DATA_FILE)) return {};
+ const raw = fs.readFileSync(DATA_FILE, 'utf-8').trim();
+ if (!raw) return {};
+ return JSON.parse(raw);
 };
 
 export const write = (data) => {
-	fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+ fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
 };

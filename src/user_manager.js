@@ -12,68 +12,68 @@ import { Role } from './plugin.js';
 import { read, write } from './store.js';
 
 export class User {
-	constructor(data) {
-		this.id = data.id;
-		this.username = data.username ?? null;
-		this.displayName = data.displayName ?? null;
-		this.roles = data.roles ?? [Role.USER];
-		this.roles = this.roles.map((r) => {
-			if (r <= 4) return [1, 10, 100, 1000, 10000][r] ?? r;
-			return r;
-		});
-		this.level = data.level ?? 1;
-		this.xp = data.xp ?? 0;
-		this.addedAt = data.addedAt ?? new Date().toISOString();
-		this.banned = data.banned ?? false;
-		this.bannedAt = data.bannedAt ?? null;
-		this.stats = data.stats ?? {};
-		this.lang = data.lang ?? 'en';
-		this.afk = data.afk ?? null;
-	}
+ constructor(data) {
+  this.id = data.id;
+  this.username = data.username ?? null;
+  this.displayName = data.displayName ?? null;
+  this.roles = data.roles ?? [Role.USER];
+  this.roles = this.roles.map((r) => {
+   if (r <= 4) return [1, 10, 100, 1000, 10000][r] ?? r;
+   return r;
+  });
+  this.level = data.level ?? 1;
+  this.xp = data.xp ?? 0;
+  this.addedAt = data.addedAt ?? new Date().toISOString();
+  this.banned = data.banned ?? false;
+  this.bannedAt = data.bannedAt ?? null;
+  this.stats = data.stats ?? {};
+  this.lang = data.lang ?? 'en';
+  this.afk = data.afk ?? null;
+ }
 
-	isAtLeast(role) {
-		return Math.max(...this.roles) >= role;
-	}
+ isAtLeast(role) {
+  return Math.max(...this.roles) >= role;
+ }
 
-	hasRole(role) {
-		return this.roles.includes(role);
-	}
+ hasRole(role) {
+  return this.roles.includes(role);
+ }
 }
 
 export class UserManager {
-	constructor() {
-		this.data = read().users || {};
-		this._saveTimer = null;
-	}
+ constructor() {
+  this.data = read().users || {};
+  this._saveTimer = null;
+ }
 
-	getUser(id) {
-		const u = this.data[id];
-		if (u && !(u instanceof User)) {
-			this.data[id] = new User(u);
-		}
-		return this.data[id] instanceof User ? this.data[id] : null;
-	}
+ getUser(id) {
+  const u = this.data[id];
+  if (u && !(u instanceof User)) {
+   this.data[id] = new User(u);
+  }
+  return this.data[id] instanceof User ? this.data[id] : null;
+ }
 
-	updateUser(id, update) {
-		const existing = this.getUser(id);
-		const data = { id, ...(existing ? { ...existing } : {}), ...update };
-		this.data[id] = data instanceof User ? data : new User(data);
-		this.save();
-		return this.data[id];
-	}
+ updateUser(id, update) {
+  const existing = this.getUser(id);
+  const data = { id, ...(existing ? { ...existing } : {}), ...update };
+  this.data[id] = data instanceof User ? data : new User(data);
+  this.save();
+  return this.data[id];
+ }
 
-	rolesEnough(id, requiredRoles) {
-		const user = this.getUser(id);
-		if (!user) return false;
-		return requiredRoles.some((role) => user.isAtLeast(role));
-	}
+ rolesEnough(id, requiredRoles) {
+  const user = this.getUser(id);
+  if (!user) return false;
+  return requiredRoles.some((role) => user.isAtLeast(role));
+ }
 
-	save() {
-		if (this._saveTimer) return;
-		this._saveTimer = setTimeout(() => {
-			this._saveTimer = null;
-			const current = read();
-			write({ ...current, users: this.data });
-		}, 5000);
-	}
+ save() {
+  if (this._saveTimer) return;
+  this._saveTimer = setTimeout(() => {
+   this._saveTimer = null;
+   const current = read();
+   write({ ...current, users: this.data });
+  }, 5000);
+ }
 }
