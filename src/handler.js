@@ -74,6 +74,9 @@ export class Handler {
 		/** @type {Array} */
 		this.watchID = [];
 
+		/** @type {boolean} */
+		this.paused = read().paused ?? false;
+
 		/** @type {Array} */
 		this.blockList = [];
 
@@ -495,6 +498,11 @@ export class Handler {
 			});
 
 			await this.updateData(ctx);
+
+			if (this.paused) {
+				const isPause = ctx.isSlash ? ctx.cmd === 'pause' : ctx.pattern && this.getCMD(ctx.pattern)?.cmd === 'pause';
+				if (!isPause) return;
+			}
 
 			for (const lsid of this.listens.values()) {
 				/** @type {import('./plugin.js').Plugin} */
