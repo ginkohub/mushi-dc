@@ -51,7 +51,8 @@ async function autoCity(m) {
       value: r.name,
     }));
     await m.respond(choices);
-  } catch {
+  } catch (e) {
+    pen.Error('weather-autocomplete', e);
     await m.respond([]);
   }
 }
