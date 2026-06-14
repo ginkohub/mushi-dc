@@ -50,7 +50,7 @@ async function search(c) {
 
     if (engine === 'yt' && query) {
       const res = await fetch(`${API}/youtube?query=${encodeURIComponent(query)}`, {
-        headers: { 'User-Agent': 'MushiBot/1.0' },
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:137.0) Gecko/20100101 Firefox/137.0' },
       });
       const data = await res.json();
       if (!data?.status || !data.data?.length) return await c.reply(t('not_found', {}, c));
@@ -61,7 +61,7 @@ async function search(c) {
 
     if (engine === 'gsm' && query) {
       const res = await fetch(`${API}/gsmarena?query=${encodeURIComponent(query)}`, {
-        headers: { 'User-Agent': 'MushiBot/1.0' },
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:137.0) Gecko/20100101 Firefox/137.0' },
       });
       const data = await res.json();
       if (!data?.status || !data.data?.length) return await c.reply(t('not_found', {}, c));
@@ -73,7 +73,7 @@ async function search(c) {
     }
 
     const res = await fetch(`${API}/duckduckgo?query=${encodeURIComponent(args)}`, {
-      headers: { 'User-Agent': 'MushiBot/1.0' },
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:137.0) Gecko/20100101 Firefox/137.0' },
     });
     const data = await res.json();
     if (!data?.status || !data.data?.results?.length) return await c.reply(t('not_found', {}, c));

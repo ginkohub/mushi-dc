@@ -10,7 +10,9 @@
 
 import * as cheerio from 'cheerio';
 import { ApplicationIntegrationType, InteractionContextType, SlashCommandBuilder } from 'discord.js';
-import { Role } from '#mushi';
+import { pen, Role } from '#mushi';
+
+const SEARCH_API = 'https://api.siputzx.my.id/api/s/duckduckgo';
 
 function splitText(text, maxLen = 2000) {
   if (text.length <= maxLen) return [text];
@@ -51,7 +53,7 @@ async function readArticle(c) {
   await c.react('⏳');
   try {
     const response = await fetch(url, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:137.0) Gecko/20100101 Firefox/137.0' },
     });
     const html = await response.text();
     const $ = cheerio.load(html);
@@ -68,7 +70,7 @@ async function readArticle(c) {
         const parsed = JSON.parse(ldJson.trim());
         const body = parsed?.articleBody || '';
         if (body) content = body;
-      } catch {}
+      } catch { }
     }
     if (!content) {
       const bodyEl = $('[class*="body-markup"]');
@@ -105,10 +107,9 @@ async function searchPosts(c) {
   if (!query) return await c.react('❌');
   await c.react('⏳');
   try {
-    const res = await fetch(
-      `https://api.siputzx.my.id/api/s/duckduckgo?query=${encodeURIComponent(`site:substack.com ${query}`)}`,
-      { headers: { 'User-Agent': 'MushiBot/1.0' } },
-    );
+    const res = await fetch(`${SEARCH_API}?query=${encodeURIComponent(`site:substack.com ${query}`)}`, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:137.0) Gecko/20100101 Firefox/137.0' },
+    });
     const data = await res.json();
     if (!data?.status || !data.data?.results?.length) return await c.reply('No results found.');
     const items = data.data.results.slice(0, 5);
@@ -116,6 +117,27 @@ async function searchPosts(c) {
     await c.reply(`**Substack Search: ${query}**\n\n${lines.join('\n\n')}`.slice(0, 1900));
   } catch {
     await c.react('❌');
+  }
+}
+
+async function autoStack(m) {
+  const sub = m.options.getSubcommand();
+  if (sub !== 'search') return await m.respond([]);
+  const query = m.options.getFocused();
+  if (!query || query.length < 2) return await m.respond([]);
+  try {
+    const res = await fetch(`${SEARCH_API}?query=${encodeURIComponent(`site:substack.com ${query}`)}`, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:137.0) Gecko/20100101 Firefox/137.0' },
+    });
+    const data = await res.json();
+    const choices = (data.data?.results || []).slice(0, 10).map((r) => ({
+      name: r.title.slice(0, 100),
+      value: r.title,
+    }));
+    await m.respond(choices);
+  } catch (e) {
+    pen.Error('stack-autocomplete', e);
+    await m.respond([]);
   }
 }
 
@@ -148,10 +170,11 @@ export default [
         s
           .setName('search')
           .setDescription('Search Substack posts')
-          .addStringOption((o) => o.setName('query').setDescription('Search query').setRequired(true)),
+          .addStringOption((o) => o.setName('query').setDescription('Search query').setRequired(true).setAutocomplete(true)),
       )
       .setIntegrationTypes(ApplicationIntegrationType.GuildInstall, ApplicationIntegrationType.UserInstall)
       .setContexts(InteractionContextType.Guild, InteractionContextType.BotDM, InteractionContextType.PrivateChannel),
+    autocomplete: autoStack,
     exec: async (c) => {
       const sub = c.event.options.getSubcommand();
       if (sub === 'read') {

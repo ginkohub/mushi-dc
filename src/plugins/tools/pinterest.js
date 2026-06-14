@@ -33,7 +33,7 @@ async function pinterest(c) {
   await c.react('⏳');
   try {
     const res = await fetch(`https://api.siputzx.my.id/api/s/pinterest?query=${encodeURIComponent(args)}&type=image`, {
-      headers: { 'User-Agent': 'MushiBot/1.0' },
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:137.0) Gecko/20100101 Firefox/137.0' },
     });
     if (!res.ok) {
       await c.react('❌');
