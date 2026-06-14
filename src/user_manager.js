@@ -16,7 +16,11 @@ export class User {
 		this.id = data.id;
 		this.username = data.username ?? null;
 		this.displayName = data.displayName ?? null;
-		this.roles = data.roles ?? [Role.GUEST];
+		this.roles = data.roles ?? [Role.USER];
+		this.roles = this.roles.map((r) => {
+			if (r <= 4) return [0, 1, 10, 100, 1000, 10000][r] ?? r;
+			return r;
+		});
 		this.level = data.level ?? 1;
 		this.xp = data.xp ?? 0;
 		this.addedAt = data.addedAt ?? new Date().toISOString();

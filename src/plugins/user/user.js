@@ -147,10 +147,10 @@ async function removeRole(c) {
 		const u = c.handler().userManager.updateUser(userOpt, {});
 		if (u?.roles.includes(role)) {
 			u.roles = u.roles.filter((r) => r !== role);
-			if (u.roles.length === 0) u.roles.push(Role.GUEST);
+			if (u.roles.length === 0) u.roles.push(Role.USER);
 			c.handler().userManager.updateUser(userOpt, { roles: u.roles });
 		}
-		return await c.reply(t('removed_role', { role: roleName, count: 1 }, c));
+		return await c.reply(t('added_role', { role: roleName, count: 1 }, c));
 	}
 	const roleName = (c.args || '').split(' ')[0]?.toUpperCase();
 	const role = Role[roleName];
@@ -158,7 +158,7 @@ async function removeRole(c) {
 	const res = applyRole(c, (u) => {
 		if (u?.roles.includes(role)) {
 			u.roles = u.roles.filter((r) => r !== role);
-			if (u.roles.length === 0) u.roles.push(Role.GUEST);
+			if (u.roles.length === 0) u.roles.push(Role.USER);
 			return true;
 		}
 		return false;

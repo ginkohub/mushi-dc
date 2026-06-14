@@ -150,7 +150,7 @@ export class Ctx {
 		this.serverName = event?.guild?.name;
 
 		/** @type {boolean} */
-		this.fromMe = event?.author?.id === this.client()?.user?.id;
+    this.fromMe = event?.author?.id === this.client()?.user?.id;
 
 		/** @type {boolean} */
 		this.isEdited = oldEvent !== null || oldEvent !== undefined;
@@ -181,6 +181,6 @@ export class Ctx {
 		}
 
 		/** @type {Array<import('./plugin.js').Role> | any} */
-		this.roles = handler.getRoles(this.sender) ?? [Role.GUEST];
+		this.roles = handler.getRoles(this.sender) ?? [Role.USER];
 	}
 }

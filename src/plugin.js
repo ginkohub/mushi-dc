@@ -15,14 +15,16 @@ import { Reason } from './reason.js';
  * @enum {number | string | any}
  */
 export const Role = Object.freeze({
-	GUEST: 0,
-	USER: 1,
-	PREMIUM: 2,
-	ADMIN: 3,
-	OWNER: 4,
+	BLOCKED: 0,
+	GUEST: 1,
+	USER: 10,
+	PREMIUM: 100,
+	ADMIN: 1000,
+	OWNER: 10000,
 });
 
 export const RoleMoji = Object.freeze({
+	[Role.BLOCKED]: '🚫',
 	[Role.GUEST]: '👤',
 	[Role.USER]: '🤵',
 	[Role.PREMIUM]: '💼',

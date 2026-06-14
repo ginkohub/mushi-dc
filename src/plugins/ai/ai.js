@@ -222,7 +222,7 @@ export default [
 		roles: [Role.USER],
 		exec: async (c) => {
 			const msg = c.event;
-			if (msg.author.id === c.client()?.user?.id) return;
+			if (!msg.author || msg.author.id === c.client()?.user?.id) return;
 			const ref = msg.reference;
 			if (!ref?.messageId) return;
 			if (!aiMessages.has(ref.messageId)) return;
