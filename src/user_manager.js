@@ -16,7 +16,7 @@ export class User {
     this.id = data.id;
     this.username = data.username ?? null;
     this.displayName = data.displayName ?? null;
-    this.roles = data.roles ?? [Role.USER];
+    this.roles = data.roles ?? [Role.GUEST];
     this.roles = this.roles.map((r) => {
       if (r <= 4) return [1, 10, 100, 1000, 10000][r] ?? r;
       return r;

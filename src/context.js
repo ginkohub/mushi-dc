@@ -157,6 +157,6 @@ export class Ctx {
     }
 
     /** @type {Array<import('./plugin.js').Role> | any} */
-    this.roles = handler?.userManager?.getUser(this.senderId)?.roles ?? [Role.USER];
+    this.roles = handler?.userManager?.getUser(this.senderId)?.roles ?? [Role.GUEST];
   }
 }

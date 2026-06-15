@@ -26,7 +26,7 @@ export const translate = (translations) => {
 };
 
 async function translateGoogle(text, target, source) {
-    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${source}&tl=${target}&dt=t&q=${encodeURIComponent(text)}`;
+  const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${source}&tl=${target}&dt=t&q=${encodeURIComponent(text)}`;
   const res = await fetch(url);
   const data = await res.json();
   const translated = data[0]?.[0]?.[0];
