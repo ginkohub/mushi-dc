@@ -175,7 +175,7 @@ async function download(c) {
 
 export default [
   {
-    roles: [Role.USER],
+    roles: [Role.GUEST],
     data: new SlashCommandBuilder()
       .setName('download')
       .setDescription('Download media from TikTok, Instagram, YouTube, etc.')

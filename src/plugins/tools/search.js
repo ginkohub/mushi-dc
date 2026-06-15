@@ -90,7 +90,7 @@ async function search(c) {
 
 export default [
   {
-    roles: [Role.USER],
+    roles: [Role.GUEST],
     data: new SlashCommandBuilder()
       .setName('search')
       .setDescription('Search web, YouTube, or GSMArena')

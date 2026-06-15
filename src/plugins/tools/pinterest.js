@@ -54,7 +54,7 @@ async function pinterest(c) {
 
 export default [
   {
-    roles: [Role.USER],
+    roles: [Role.GUEST],
     data: new SlashCommandBuilder()
       .setName('pinterest')
       .setDescription('Search Pinterest images')

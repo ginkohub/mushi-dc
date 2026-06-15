@@ -214,7 +214,7 @@ export default [
         if (!text) return;
         const sent = await msg.reply(text);
         if (sent?.id) aiMessages.add(sent.id);
-      } catch {}
+      } catch { }
     },
   },
   {

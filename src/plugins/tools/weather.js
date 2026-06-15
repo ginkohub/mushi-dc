@@ -88,7 +88,7 @@ async function weather(c) {
 
 export default [
   {
-    roles: [Role.USER],
+    roles: [Role.GUEST],
     autocomplete: autoCity,
     data: new SlashCommandBuilder()
       .setName('weather')

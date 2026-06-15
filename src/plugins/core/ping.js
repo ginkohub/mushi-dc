@@ -31,7 +31,7 @@ async function ping(c) {
 
 export default [
   {
-    roles: [Role.USER],
+    roles: [Role.GUEST],
     data: new SlashCommandBuilder()
       .setName('ping')
       .setDescription('Ping the bot')

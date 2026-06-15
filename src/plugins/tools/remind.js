@@ -41,7 +41,7 @@ async function remind(c) {
 
 export default [
   {
-    roles: [Role.USER],
+    roles: [Role.GUEST],
     data: new SlashCommandBuilder()
       .setName('remind')
       .setDescription('Set a reminder (e.g. 10s, 5m, 2h, 1d)')

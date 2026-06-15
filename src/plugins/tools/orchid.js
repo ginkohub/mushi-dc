@@ -56,7 +56,7 @@ async function orchid(c) {
 
 export default [
   {
-    roles: [Role.USER],
+    roles: [Role.GUEST],
     data: new SlashCommandBuilder()
       .setName('orchid')
       .setDescription('Search academic journals and articles via CrossRef')

@@ -21,7 +21,7 @@ async function status(c) {
 
 export default [
   {
-    roles: [Role.USER],
+    roles: [Role.GUEST],
     data: new SlashCommandBuilder()
       .setName('status')
       .setDescription('Get bot status')

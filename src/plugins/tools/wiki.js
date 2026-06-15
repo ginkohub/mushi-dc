@@ -47,7 +47,7 @@ async function wiki(c) {
 
 export default [
   {
-    roles: [Role.USER],
+    roles: [Role.GUEST],
     autocomplete: autoQuery,
     data: new SlashCommandBuilder()
       .setName('wiki')

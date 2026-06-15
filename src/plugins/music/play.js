@@ -10,7 +10,7 @@
  * Credits: siputzx.my.id - unofficial YouTube search API
  */
 
-import { ApplicationIntegrationType, InteractionContextType, SlashCommandBuilder } from 'discord.js';
+import { ApplicationIntegrationType, InteractionContextType, MessageFlags, SlashCommandBuilder } from 'discord.js';
 import { Role } from '#mushi';
 import { connect, formatDuration, getState, getYT, playSong, resolveSong } from './_player.js';
 
@@ -20,7 +20,7 @@ async function exec(c) {
 
   const voiceChannel = c.event.member?.voice?.channel;
   if (!voiceChannel) {
-    await c.event.reply({ content: 'You must be in a voice channel.', ephemeral: true });
+    await c.event.reply({ content: 'You must be in a voice channel.', flags: MessageFlags.Ephemeral });
     return;
   }
 

@@ -44,7 +44,7 @@ async function speedtest(c) {
 
 export default [
   {
-    roles: [Role.USER],
+    roles: [Role.GUEST],
     data: new SlashCommandBuilder()
       .setName('speedtest')
       .setDescription('Run a network speed test')
