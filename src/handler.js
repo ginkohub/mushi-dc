@@ -103,14 +103,17 @@ export class Handler {
         interval: 1000,
       })
       .on('change', (loc) => {
+        if (!loc.endsWith('.js')) return;
         this.pen.Debug('Plugin changed:', loc);
         this.loadFile(loc);
       })
       .on('add', (loc) => {
+        if (!loc.endsWith('.js')) return;
         this.pen.Debug('Plugin added:', loc);
         this.loadFile(loc);
       })
       .on('unlink', (loc) => {
+        if (!loc.endsWith('.js')) return;
         this.pen.Debug('Plugin removed:', loc);
         const hash = hashCRC32(loc);
         this.removeOn(hash);
