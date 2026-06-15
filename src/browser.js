@@ -49,6 +49,9 @@ export class Browser {
       const res = await fetch(url, { ...init, headers, signal });
       return res;
     } catch (e) {
+      if (e.name === 'AbortError') {
+        throw e;
+      }
       if (e.name === 'TimeoutError') {
         pen.Error('browser', `Request to ${url} timed out`);
       } else {
@@ -79,6 +82,7 @@ export class Browser {
     try {
       return JSON.parse(text);
     } catch (e) {
+      if (e.name === 'AbortError') throw e;
       const snippet = text.slice(0, 100).replace(/\r?\n/g, '\\n');
       throw new Error(`Failed to parse JSON: ${e.message} (Response: "${snippet}...")`);
     }
@@ -108,7 +112,8 @@ export class Browser {
    * Static helper for a one-off JSON request.
    */
   static async json(url, init = {}) {
-    return new Browser().getJSON(url, init);
+    const b = new Browser();
+    return b.getJSON(url, init);
   }
 }
 
