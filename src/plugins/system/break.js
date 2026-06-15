@@ -27,16 +27,9 @@ async function togglePause(c) {
 
 export default [
   {
-    cmd: ['pause'],
-    cat: 'system',
-    desc: 'Pause/resume all bot responses',
-    roles: [Role.ADMIN],
-    exec: togglePause,
-  },
-  {
     roles: [Role.ADMIN],
     data: new SlashCommandBuilder()
-      .setName('pause')
+      .setName('break')
       .setDescription('Pause/resume all bot responses')
       .setIntegrationTypes(ApplicationIntegrationType.GuildInstall, ApplicationIntegrationType.UserInstall)
       .setContexts(InteractionContextType.Guild, InteractionContextType.BotDM, InteractionContextType.PrivateChannel),
