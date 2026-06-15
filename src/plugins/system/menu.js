@@ -52,13 +52,6 @@ async function showMenu(c) {
 
 export default [
   {
-    cmd: ['menu', 'help', 'h'],
-    cat: 'system',
-    desc: 'Show all available commands',
-    roles: [Role.USER],
-    exec: showMenu,
-  },
-  {
     data: new SlashCommandBuilder()
       .setName('menu')
       .setDescription('Show all available commands')

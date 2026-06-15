@@ -85,7 +85,7 @@ typeCommand.addStringOption((o) =>
 );
 
 async function random(c) {
-  const args = c.isSlash ? c.event.options.getString('type') || '' : (c.args || '').trim().toLowerCase();
+  const args = c.event.options.getString('type') || '';
   if (!args || args === '?') {
     return await c.reply([t('help_title', {}, c), '', t('help_usage', {}, c), t('help_list', {}, c)].join('\n'));
   }
@@ -140,13 +140,6 @@ async function random(c) {
 }
 
 export default [
-  {
-    cmd: ['random', 'rand'],
-    cat: 'fun',
-    desc: 'Random content (anime quote, images, etc.)',
-    roles: [Role.USER],
-    exec: random,
-  },
   {
     roles: [Role.USER],
     data: typeCommand,

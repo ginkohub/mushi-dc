@@ -9,8 +9,6 @@
  */
 
 import { Events } from 'discord.js';
-import minimist from 'minimist';
-import parseArgsStringToArgv from 'string-argv';
 import { Role } from './plugin.js';
 
 /**
@@ -102,15 +100,6 @@ export class Ctx {
 
         /** @type {boolean} */
         this.isCMD = handler?.isCMD(this.pattern);
-
-        if (this.args && this.args?.length > 0) {
-          try {
-            /** @type {import('minimist').ParsedArgs} */
-            this.argv = minimist(parseArgsStringToArgv(this.args));
-          } catch {
-            /* do nothing */
-          }
-        }
       }
     };
 
@@ -163,17 +152,19 @@ export class Ctx {
 
     switch (eventType) {
       case Events.InteractionCreate:
-        this.argv = {};
-        event.options?.data?.forEach((o) => {
-          this.argv[o.name] = o.value;
-        });
-        this.cmd = event.commandName;
-        this.isCMD = true;
+        if (event.isCommand?.() || event.isAutocomplete?.()) {
+          this.argv = {};
+          event.options?.data?.forEach((o) => {
+            this.argv[o.name] = o.value;
+          });
+          this.cmd = event.commandName;
+          this.isCMD = true;
 
-        /** @type {boolean} */
-        this.isSlash = true;
+          /** @type {boolean} */
+          this.isSlash = true;
 
-        this.text = `/${event.commandName}`;
+          this.text = `/${event.commandName}`;
+        }
         break;
 
       default:

@@ -87,13 +87,6 @@ async function search(c) {
 
 export default [
   {
-    cmd: ['search', 's'],
-    cat: 'tools',
-    desc: 'Search web, YouTube, or GSMArena',
-    roles: [Role.USER],
-    exec: search,
-  },
-  {
     roles: [Role.USER],
     data: new SlashCommandBuilder()
       .setName('search')

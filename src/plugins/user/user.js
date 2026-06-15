@@ -52,28 +52,9 @@ const t = translate({
 
 const roleChoices = Object.keys(Role).map((k) => ({ name: k, value: k }));
 
-function applyRole(c, fn) {
-  const mentions = c.event.mentions?.users;
-  if (!mentions || mentions.size === 0) return { ok: false, msg: t('no_user', {}, c) };
-  let count = 0;
-  mentions.forEach((u) => {
-    const user = c.handler().userManager.updateUser(u.id, {});
-    if (fn(user)) {
-      count++;
-      c.handler().userManager.updateUser(u.id, { roles: user.roles });
-    }
-  });
-  return { ok: true, count };
-}
-
 async function userInfo(c) {
-  if (c.isSlash) {
-    const targetId = c.event.options.getUser('user')?.id || c.senderId;
-    return await showUserInfo(c, targetId);
-  }
-  const mentions = c.event.mentions?.users;
-  const targets = mentions?.size > 0 ? mentions.map((u) => u.id) : [c.senderId];
-  for (const id of targets) await showUserInfo(c, id);
+  const targetId = c.event.options.getUser('user')?.id || c.senderId;
+  return await showUserInfo(c, targetId);
 }
 
 async function showUserInfo(c, id) {
@@ -114,85 +95,41 @@ async function showUserInfo(c, id) {
 }
 
 async function addRole(c) {
-  if (c.isSlash) {
-    const userOpt = c.event.options.getUser('user').id;
-    const roleName = c.event.options.getString('role').toUpperCase();
-    const role = Role[roleName];
-    if (role === undefined) return await c.reply(t('invalid_role', { val: Object.keys(Role).join(', ') }, c));
-    const u = c.handler().userManager.updateUser(userOpt, {});
-    if (u && !u.roles.includes(role)) {
-      u.roles.push(role);
-      c.handler().userManager.updateUser(userOpt, { roles: u.roles });
-    }
-    return await c.reply(t('added_role', { role: roleName, count: 1 }, c));
-  }
-  const roleName = (c.args || '').split(' ')[0]?.toUpperCase();
+  const userOpt = c.event.options.getUser('user').id;
+  const roleName = c.event.options.getString('role').toUpperCase();
   const role = Role[roleName];
   if (role === undefined) return await c.reply(t('invalid_role', { val: Object.keys(Role).join(', ') }, c));
-  const res = applyRole(c, (u) => {
-    if (u && !u.roles.includes(role)) {
-      u.roles.push(role);
-      return true;
-    }
-    return false;
-  });
-  if (!res.ok) return await c.reply(res.msg);
-  await c.reply(t('added_role', { role: roleName, count: res.count }, c));
+  const u = c.handler().userManager.updateUser(userOpt, {});
+  if (u && !u.roles.includes(role)) {
+    u.roles.push(role);
+    c.handler().userManager.updateUser(userOpt, { roles: u.roles });
+  }
+  return await c.reply(t('added_role', { role: roleName, count: 1 }, c));
 }
 
 async function removeRole(c) {
-  if (c.isSlash) {
-    const userOpt = c.event.options.getUser('user').id;
-    const roleName = c.event.options.getString('role').toUpperCase();
-    const role = Role[roleName];
-    if (role === undefined) return await c.reply(t('invalid_role', { val: Object.keys(Role).join(', ') }, c));
-    const u = c.handler().userManager.updateUser(userOpt, {});
-    if (u?.roles.includes(role)) {
-      u.roles = u.roles.filter((r) => r !== role);
-      if (u.roles.length === 0) u.roles.push(Role.USER);
-      c.handler().userManager.updateUser(userOpt, { roles: u.roles });
-    }
-    return await c.reply(t('added_role', { role: roleName, count: 1 }, c));
-  }
-  const roleName = (c.args || '').split(' ')[0]?.toUpperCase();
+  const userOpt = c.event.options.getUser('user').id;
+  const roleName = c.event.options.getString('role').toUpperCase();
   const role = Role[roleName];
   if (role === undefined) return await c.reply(t('invalid_role', { val: Object.keys(Role).join(', ') }, c));
-  const res = applyRole(c, (u) => {
-    if (u?.roles.includes(role)) {
-      u.roles = u.roles.filter((r) => r !== role);
-      if (u.roles.length === 0) u.roles.push(Role.USER);
-      return true;
-    }
-    return false;
-  });
-  if (!res.ok) return await c.reply(res.msg);
-  await c.reply(t('removed_role', { role: roleName, count: res.count }, c));
+  const u = c.handler().userManager.updateUser(userOpt, {});
+  if (u?.roles.includes(role)) {
+    u.roles = u.roles.filter((r) => r !== role);
+    if (u.roles.length === 0) u.roles.push(Role.USER);
+    c.handler().userManager.updateUser(userOpt, { roles: u.roles });
+  }
+  return await c.reply(t('added_role', { role: roleName, count: 1 }, c));
 }
 
 async function addUser(c) {
-  if (c.isSlash) {
-    c.handler().userManager.updateUser(c.event.options.getUser('user').id, {});
-    return await c.reply('Added/verified user.');
-  }
-  const mentions = c.event.mentions?.users;
-  const targets = mentions?.size > 0 ? mentions.map((u) => u.id) : c.args.trim() ? [c.args.trim()] : [];
-  if (targets.length === 0) return await c.reply('Usage: .user+ <id> or @mention');
-  for (const id of targets) c.handler().userManager.updateUser(id, {});
-  await c.reply(`Added/verified ${targets.length} user(s).`);
+  c.handler().userManager.updateUser(c.event.options.getUser('user').id, {});
+  return await c.reply('Added/verified user.');
 }
 
 async function removeUser(c) {
-  if (c.isSlash) {
-    delete c.handler().userManager.data[c.event.options.getUser('user').id];
-    c.handler().userManager.save();
-    return await c.reply('Removed user from database.');
-  }
-  const mentions = c.event.mentions?.users;
-  const targets = mentions?.size > 0 ? mentions.map((u) => u.id) : c.args.trim() ? [c.args.trim()] : [];
-  if (targets.length === 0) return await c.reply('Usage: .user- <id> or @mention');
-  for (const id of targets) delete c.handler().userManager.data[id];
+  delete c.handler().userManager.data[c.event.options.getUser('user').id];
   c.handler().userManager.save();
-  await c.reply(`Removed ${targets.length} user(s) from database.`);
+  return await c.reply('Removed user from database.');
 }
 
 const baseCtx = (name) =>
@@ -202,11 +139,6 @@ const baseCtx = (name) =>
     .setContexts(InteractionContextType.Guild, InteractionContextType.BotDM, InteractionContextType.PrivateChannel);
 
 export default [
-  { cmd: ['user'], cat: 'user', desc: 'Get user info', roles: [Role.USER], exec: userInfo },
-  { cmd: ['role+'], cat: 'admin', desc: 'Add role to user', roles: [Role.ADMIN], exec: addRole },
-  { cmd: ['role-'], cat: 'admin', desc: 'Remove role from user', roles: [Role.ADMIN], exec: removeRole },
-  { cmd: ['user+'], cat: 'admin', desc: 'Add/verify user to database', roles: [Role.ADMIN], exec: addUser },
-  { cmd: ['user-'], cat: 'admin', desc: 'Remove user from database', roles: [Role.ADMIN], exec: removeUser },
   {
     roles: [Role.ADMIN],
     data: baseCtx('user')

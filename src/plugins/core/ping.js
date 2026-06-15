@@ -30,14 +30,6 @@ async function ping(c) {
 }
 
 export default [
-  /* prefixed command plugin */
-  {
-    cmd: ['ping', 'p'],
-    roles: [Role.USER],
-    exec: ping,
-  },
-
-  /* data field indicated that will registered as slash command */
   {
     roles: [Role.USER],
     data: new SlashCommandBuilder()

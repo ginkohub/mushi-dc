@@ -21,11 +21,6 @@ async function status(c) {
 
 export default [
   {
-    cmd: 'status',
-    roles: [Role.USER],
-    exec: status,
-  },
-  {
     roles: [Role.USER],
     data: new SlashCommandBuilder()
       .setName('status')

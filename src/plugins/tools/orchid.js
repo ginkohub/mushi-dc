@@ -53,13 +53,6 @@ async function orchid(c) {
 
 export default [
   {
-    cmd: ['orchid', 'ojf'],
-    cat: 'tools',
-    desc: 'Search academic journals and articles via CrossRef',
-    roles: [Role.USER],
-    exec: orchid,
-  },
-  {
     roles: [Role.USER],
     data: new SlashCommandBuilder()
       .setName('orchid')

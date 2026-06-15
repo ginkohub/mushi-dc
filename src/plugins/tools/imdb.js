@@ -38,13 +38,6 @@ async function searchIMDb(c) {
 
 export default [
   {
-    cmd: ['imdb', 'movie', 'film'],
-    cat: 'tools',
-    desc: 'Search movies and TV shows on IMDb. Reply with a number for details.',
-    roles: [Role.USER],
-    exec: searchIMDb,
-  },
-  {
     exec: async (c) => {
       const msg = c.event;
       if (!msg.content || msg.author.id !== c.client()?.user?.id) return;

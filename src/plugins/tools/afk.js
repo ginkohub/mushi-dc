@@ -22,29 +22,6 @@ const ago = (ms) => {
 
 export default [
   {
-    cmd: ['afk'],
-    cat: 'tools',
-    desc: 'Set yourself as AFK with optional reason',
-    roles: [Role.USER],
-    exec: async (c) => {
-      const reason = c.args?.trim() || 'AFK';
-      c.handler().userManager.updateUser(c.senderId, {
-        afk: { reason, since: Date.now() },
-      });
-      await c.reply(`You are now AFK: ${reason}`);
-    },
-  },
-  {
-    cmd: ['back'],
-    cat: 'tools',
-    desc: 'Remove AFK status',
-    roles: [Role.USER],
-    exec: async (c) => {
-      c.handler().userManager.updateUser(c.senderId, { afk: null });
-      await c.reply('Welcome back!');
-    },
-  },
-  {
     exec: async (c) => {
       const msg = c.event;
       if (!msg?.author) return;

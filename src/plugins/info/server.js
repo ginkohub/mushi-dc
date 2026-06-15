@@ -32,13 +32,6 @@ async function serverInfo(c) {
 
 export default [
   {
-    cmd: ['server', 'guild'],
-    cat: 'info',
-    desc: 'Show current guild/server info',
-    roles: [Role.USER],
-    exec: serverInfo,
-  },
-  {
     data: new SlashCommandBuilder()
       .setName('server')
       .setDescription('Show current guild/server info')

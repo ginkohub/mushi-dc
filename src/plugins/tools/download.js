@@ -79,7 +79,7 @@ async function downloadInstagram(url) {
 }
 
 async function download(c) {
-  const raw = c.isSlash ? c.event.options.getString('url') || '' : c.args || '';
+  const raw = c.event.options.getString('url') || '';
   const allowLarge = /(?:^|\s)(?:-f|--force)(?:\s|$)/.test(raw);
   const clean = raw.replace(/(?:^|\s)(?:-f|--force)(?:\s|$)/, ' ').trim();
   let urls = clean.match(/https?:\/\/[^\s]+/g) || [];
@@ -170,13 +170,6 @@ async function download(c) {
 }
 
 export default [
-  {
-    cmd: ['download', 'dl'],
-    cat: 'tools',
-    desc: 'Download media from TikTok, Instagram, YouTube, etc.',
-    roles: [Role.USER],
-    exec: download,
-  },
   {
     roles: [Role.USER],
     data: new SlashCommandBuilder()

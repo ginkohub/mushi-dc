@@ -30,7 +30,7 @@ async function autoQuery(m) {
 }
 
 async function wiki(c) {
-  const query = c.isSlash ? c.event.options.getString('query') || '' : (c.args || '').trim();
+  const query = c.event.options.getString('query') || '';
   if (!query) return await c.react('❌');
   try {
     const result = await searchWiki(query);
@@ -43,13 +43,6 @@ async function wiki(c) {
 }
 
 export default [
-  {
-    cmd: ['wiki', 'wikipedia'],
-    cat: 'tools',
-    desc: 'Search Wikipedia for a topic',
-    roles: [Role.USER],
-    exec: wiki,
-  },
   {
     roles: [Role.USER],
     autocomplete: autoQuery,

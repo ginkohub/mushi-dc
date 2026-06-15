@@ -115,20 +115,6 @@ const base = (name) =>
 
 export default [
   {
-    cmd: ['gempa'],
-    cat: 'tools',
-    desc: 'Info gempa terbaru dari BMKG',
-    roles: [Role.USER],
-    exec: latestQuake,
-  },
-  {
-    cmd: ['gempaterkini', 'gempata'],
-    cat: 'tools',
-    desc: 'Daftar gempa terkini dari BMKG',
-    roles: [Role.USER],
-    exec: recentQuakes,
-  },
-  {
     data: base('gempa')
       .setDescription('Info gempa dari BMKG')
       .addSubcommand((s) => s.setName('latest').setDescription('Gempa terbaru'))

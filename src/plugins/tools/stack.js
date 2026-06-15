@@ -70,7 +70,7 @@ async function readArticle(c) {
         const parsed = JSON.parse(ldJson.trim());
         const body = parsed?.articleBody || '';
         if (body) content = body;
-      } catch { }
+      } catch {}
     }
     if (!content) {
       const bodyEl = $('[class*="body-markup"]');
@@ -143,20 +143,6 @@ async function autoStack(m) {
 
 export default [
   {
-    cmd: ['stack', 'stk'],
-    cat: 'tools',
-    desc: 'Read a Substack article',
-    roles: [Role.USER],
-    exec: readArticle,
-  },
-  {
-    cmd: ['stss', 'substacksearch', 'sts'],
-    cat: 'tools',
-    desc: 'Search Substack posts',
-    roles: [Role.USER],
-    exec: searchPosts,
-  },
-  {
     data: new SlashCommandBuilder()
       .setName('stack')
       .setDescription('Read or search Substack articles')
@@ -170,7 +156,9 @@ export default [
         s
           .setName('search')
           .setDescription('Search Substack posts')
-          .addStringOption((o) => o.setName('query').setDescription('Search query').setRequired(true).setAutocomplete(true)),
+          .addStringOption((o) =>
+            o.setName('query').setDescription('Search query').setRequired(true).setAutocomplete(true),
+          ),
       )
       .setIntegrationTypes(ApplicationIntegrationType.GuildInstall, ApplicationIntegrationType.UserInstall)
       .setContexts(InteractionContextType.Guild, InteractionContextType.BotDM, InteractionContextType.PrivateChannel),

@@ -12,7 +12,7 @@ import { ApplicationIntegrationType, InteractionContextType, SlashCommandBuilder
 import { Role } from '#mushi';
 
 async function evalCmd(c) {
-  const src = c.isSlash ? c.event.options.getString('code') || '' : c.args?.trim() || '';
+  const src = c.event.options.getString('code') || '';
   if (!src) return;
 
   try {
@@ -27,13 +27,6 @@ async function evalCmd(c) {
 }
 
 export default [
-  {
-    cmd: ['eval', '>'],
-    cat: 'system',
-    desc: 'Evaluate JavaScript code',
-    roles: [Role.OWNER],
-    exec: evalCmd,
-  },
   {
     roles: [Role.OWNER],
     data: new SlashCommandBuilder()

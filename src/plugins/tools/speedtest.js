@@ -44,13 +44,6 @@ async function speedtest(c) {
 
 export default [
   {
-    cmd: ['speedtest', 'st'],
-    cat: 'tools',
-    desc: 'Run a network speed test',
-    roles: [Role.USER],
-    exec: speedtest,
-  },
-  {
     roles: [Role.USER],
     data: new SlashCommandBuilder()
       .setName('speedtest')

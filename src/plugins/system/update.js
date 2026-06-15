@@ -51,13 +51,6 @@ async function update(c) {
 
 export default [
   {
-    cmd: ['update', 'up'],
-    cat: 'system',
-    desc: 'Git pull and restart',
-    roles: [Role.OWNER],
-    exec: update,
-  },
-  {
     roles: [Role.OWNER],
     data: new SlashCommandBuilder()
       .setName('update')

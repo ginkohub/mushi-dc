@@ -58,7 +58,7 @@ async function autoCity(m) {
 }
 
 async function weather(c) {
-  const query = c.isSlash ? c.event.options.getString('city') || '' : (c.args || '').trim();
+  const query = c.event.options.getString('city') || '';
   if (!query || query === '?') {
     return await c.reply([t('help_title', {}, c), '', t('help_usage', {}, c)].join('\n'));
   }
@@ -84,13 +84,6 @@ async function weather(c) {
 }
 
 export default [
-  {
-    cmd: ['weather', 'cuaca'],
-    cat: 'tools',
-    desc: 'Check current weather for a city',
-    roles: [Role.USER],
-    exec: weather,
-  },
   {
     roles: [Role.USER],
     autocomplete: autoCity,

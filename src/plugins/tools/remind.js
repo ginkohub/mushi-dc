@@ -14,9 +14,7 @@ import { Role } from '#mushi';
 const pending = new Map();
 
 async function remind(c) {
-  const args = c.isSlash
-    ? `${c.event.options.getString('duration')} ${c.event.options.getString('text')}`
-    : c.args?.trim() || '';
+  const args = `${c.event.options.getString('duration')} ${c.event.options.getString('text')}`;
   if (!args) return await c.react('❌');
 
   const match = args.match(/^(\d+)(s|m|h|d)\s+(.+)/i);
@@ -42,13 +40,6 @@ async function remind(c) {
 }
 
 export default [
-  {
-    cmd: ['remind', 'rm'],
-    cat: 'tools',
-    desc: 'Set a reminder (e.g. 10s, 5m, 2h, 1d)',
-    roles: [Role.USER],
-    exec: remind,
-  },
   {
     roles: [Role.USER],
     data: new SlashCommandBuilder()

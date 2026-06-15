@@ -27,7 +27,7 @@ const t = translate({
 });
 
 async function setLang(c) {
-  const lang = c.isSlash ? c.argv?.lang : (c.args || '').trim().toLowerCase();
+  const lang = c.event.options.getString('lang');
   const available = ['en', 'id'];
 
   if (!lang) {
@@ -43,13 +43,6 @@ async function setLang(c) {
 }
 
 export default [
-  {
-    cmd: ['lang', 'language'],
-    cat: 'system',
-    desc: 'Set your preferred language',
-    roles: [Role.USER],
-    exec: setLang,
-  },
   {
     data: new SlashCommandBuilder()
       .setName('lang')

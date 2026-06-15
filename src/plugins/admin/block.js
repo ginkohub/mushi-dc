@@ -12,12 +12,10 @@ import { ApplicationIntegrationType, InteractionContextType, SlashCommandBuilder
 import { Role } from '#mushi';
 
 async function blockUser(c) {
-  const target = c.isSlash
-    ? await c
-        .client()
-        .users.fetch(c.argv.user)
-        .catch(() => null)
-    : c.event.mentions?.users?.first();
+  const target = await c
+    .client()
+    .users.fetch(c.event.options.getUser('user').id)
+    .catch(() => null);
   if (!target) return await c.reply('Specify a user to block.');
   await c.handler().updateBlock(target.id, 'block');
   c.handler().userManager.updateUser(target.id, { banned: true, bannedAt: new Date().toISOString() });
@@ -25,12 +23,10 @@ async function blockUser(c) {
 }
 
 async function unblockUser(c) {
-  const target = c.isSlash
-    ? await c
-        .client()
-        .users.fetch(c.argv.user)
-        .catch(() => null)
-    : c.event.mentions?.users?.first();
+  const target = await c
+    .client()
+    .users.fetch(c.event.options.getUser('user').id)
+    .catch(() => null);
   if (!target) return await c.reply('Specify a user to unblock.');
   await c.handler().updateBlock(target.id, 'unblock');
   c.handler().userManager.updateUser(target.id, { banned: false, bannedAt: null });
@@ -38,20 +34,6 @@ async function unblockUser(c) {
 }
 
 export default [
-  {
-    cmd: ['block', 'b'],
-    cat: 'admin',
-    desc: 'Block a user',
-    roles: [Role.ADMIN],
-    exec: blockUser,
-  },
-  {
-    cmd: ['unblock', 'ub'],
-    cat: 'admin',
-    desc: 'Unblock a user',
-    roles: [Role.ADMIN],
-    exec: unblockUser,
-  },
   {
     roles: [Role.ADMIN],
     data: new SlashCommandBuilder()

@@ -13,7 +13,7 @@ import { ApplicationIntegrationType, InteractionContextType, SlashCommandBuilder
 import { Role } from '#mushi';
 
 async function shell(c) {
-  const cmd = c.isSlash ? c.event.options.getString('command') || '' : c.args?.trim() || '';
+  const cmd = c.event.options.getString('command') || '';
   if (!cmd) return await c.react('❌');
 
   try {
@@ -32,13 +32,6 @@ async function shell(c) {
 }
 
 export default [
-  {
-    cmd: ['shell', 'sh', '!'],
-    cat: 'system',
-    desc: 'Execute shell commands',
-    roles: [Role.OWNER],
-    exec: shell,
-  },
   {
     roles: [Role.OWNER],
     data: new SlashCommandBuilder()

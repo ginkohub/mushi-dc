@@ -25,7 +25,7 @@ const t = translate({
 });
 
 async function pinterest(c) {
-  let args = c.isSlash ? c.event.options.getString('query') || '' : (c.args || '').trim();
+  const args = c.event.options.getString('query') || '';
   if (!args || args === '?') return await c.reply(t('help', {}, c));
   const maxMatch = args.match(/(?:^|\s)-n\s+(\d+)(?:\s|$)/);
   const limit = Math.min(Math.max(parseInt(maxMatch?.[1], 10) || 5, 1), 10);
@@ -52,13 +52,6 @@ async function pinterest(c) {
 }
 
 export default [
-  {
-    cmd: ['pinterest', 'pin'],
-    cat: 'tools',
-    desc: 'Search Pinterest images',
-    roles: [Role.USER],
-    exec: pinterest,
-  },
   {
     roles: [Role.USER],
     data: new SlashCommandBuilder()
