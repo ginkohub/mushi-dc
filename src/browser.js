@@ -24,8 +24,6 @@ export class Browser {
         'User-Agent': USER_AGENT,
         Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.5',
-        'Accept-Encoding': 'gzip, deflate, br, zstd',
-        Connection: 'keep-alive',
         'Upgrade-Insecure-Requests': '1',
         'Sec-Fetch-Dest': 'document',
         'Sec-Fetch-Mode': 'navigate',
@@ -68,13 +66,22 @@ export class Browser {
    * @returns {Promise<any>} The parsed JSON data.
    */
   async getJSON(url, init = {}) {
-    const res = await this.fetch(url, { ...init, method: 'GET' });
+    const headers = { Accept: 'application/json, text/plain, */*', ...init.headers };
+    const res = await this.fetch(url, { ...init, headers, method: 'GET' });
     if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+
     const contentType = res.headers.get('content-type');
     if (!contentType?.includes('application/json')) {
       throw new Error(`Expected JSON but received ${contentType}`);
     }
-    return await res.json();
+
+    const text = await res.text();
+    try {
+      return JSON.parse(text);
+    } catch (e) {
+      const snippet = text.slice(0, 100).replace(/\r?\n/g, '\\n');
+      throw new Error(`Failed to parse JSON: ${e.message} (Response: "${snippet}...")`);
+    }
   }
 
   /**
