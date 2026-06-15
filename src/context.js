@@ -67,7 +67,14 @@ export class Ctx {
     this.lang = this.user()?.lang || 'en';
 
     /** @param {string | import('discord.js').MessagePayload | import('discord.js').MessageReplyOptions} content */
-    this.reply = async (content) => await event.reply(content);
+    this.reply = async (content) => {
+      if (eventType === Events.InteractionCreate && typeof event.reply === 'function') {
+        if (event.replied) return await event.followUp(content);
+        if (event.deferred) return await event.editReply(content);
+        return await event.reply(content);
+      }
+      return await event.reply(content);
+    };
 
     /** @param {string | import('discord.js').MessagePayload | import('discord.js').MessageReplyOptions} content */
     this.send = async (content) => await event?.channel?.send(content);
