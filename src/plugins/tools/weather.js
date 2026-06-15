@@ -43,19 +43,22 @@ const t = translate({
   },
 });
 
-async function autoCity(m) {
+async function autoCity(m, signal) {
   const query = m.options.getFocused();
-  if (!query || query.length < 2) return await m.respond([]);
+  if (!query || query.length < 3) return [];
   try {
-    const data = await Browser.json(`${GEO_API}?name=${encodeURIComponent(query)}&count=5&language=en&format=json`);
-    const choices = (data.results || []).map((r) => ({
+    const data = await Browser.json(`${GEO_API}?name=${encodeURIComponent(query)}&count=5&language=en&format=json`, {
+      signal,
+    });
+    return (data.results || []).map((r) => ({
       name: `${r.name}${r.country ? `, ${r.country}` : ''}${r.admin1 ? ` (${r.admin1})` : ''}`,
       value: r.name,
     }));
-    await m.respond(choices);
   } catch (e) {
-    pen.Error('weather-autocomplete', e);
-    await m.respond([]);
+    if (e.name !== 'AbortError') {
+      pen.Error('weather-autocomplete', e);
+    }
+    return [];
   }
 }
 

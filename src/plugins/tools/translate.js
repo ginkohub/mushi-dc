@@ -90,13 +90,13 @@ const LANGUAGES = [
   { name: 'Yiddish', value: 'yi' },
 ];
 
-async function autoLang(m) {
+async function autoLang(m, _signal) {
   const query = m.options.getFocused().toLowerCase();
-  if (!query) return await m.respond(LANGUAGES.slice(0, 25));
-  const filtered = LANGUAGES.filter(
-    (l) => l.name.toLowerCase().includes(query) || l.value.toLowerCase().includes(query),
-  ).slice(0, 25);
-  await m.respond(filtered);
+  if (!query) return LANGUAGES.slice(0, 25);
+  return LANGUAGES.filter((l) => l.name.toLowerCase().includes(query) || l.value.toLowerCase().includes(query)).slice(
+    0,
+    25,
+  );
 }
 
 export default [

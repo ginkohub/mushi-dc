@@ -16,18 +16,20 @@ import { Browser, pen, Role, searchWiki } from '#mushi';
 
 const WIKI_API = 'https://en.wikipedia.org/w/api.php';
 
-async function autoQuery(m) {
+async function autoQuery(m, signal) {
   const query = m.options.getFocused();
-  if (!query || query.length < 2) return await m.respond([]);
+  if (!query || query.length < 3) return [];
   try {
     const data = await Browser.json(
       `${WIKI_API}?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&srlimit=10`,
+      { signal },
     );
-    const choices = (data.query?.search || []).map((p) => ({ name: p.title.slice(0, 100), value: p.title }));
-    await m.respond(choices);
+    return (data.query?.search || []).map((p) => ({ name: p.title.slice(0, 100), value: p.title }));
   } catch (e) {
-    pen.Error('wiki-autocomplete', e);
-    await m.respond([]);
+    if (e.name !== 'AbortError') {
+      pen.Error('wiki-autocomplete', e);
+    }
+    return [];
   }
 }
 

@@ -117,21 +117,24 @@ async function searchPosts(c) {
   }
 }
 
-async function autoStack(m) {
+async function autoStack(m, signal) {
   const sub = m.options.getSubcommand();
-  if (sub !== 'search') return await m.respond([]);
+  if (sub !== 'search') return [];
   const query = m.options.getFocused();
-  if (!query || query.length < 2) return await m.respond([]);
+  if (!query || query.length < 3) return [];
   try {
-    const data = await Browser.json(`${SEARCH_API}?query=${encodeURIComponent(`site:substack.com ${query}`)}`);
-    const choices = (data.data?.results || []).slice(0, 10).map((r) => ({
+    const data = await Browser.json(`${SEARCH_API}?query=${encodeURIComponent(`site:substack.com ${query}`)}`, {
+      signal,
+    });
+    return (data.data?.results || []).slice(0, 10).map((r) => ({
       name: r.title.slice(0, 100),
       value: r.title,
     }));
-    await m.respond(choices);
   } catch (e) {
-    pen.Error('stack-autocomplete', e);
-    await m.respond([]);
+    if (e.name !== 'AbortError') {
+      pen.Error('stack-autocomplete', e);
+    }
+    return [];
   }
 }
 
