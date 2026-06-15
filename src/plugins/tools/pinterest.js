@@ -6,6 +6,9 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/
  *
  * This code is part of Ginko project (https://github.com/ginkohub)
+ *
+ * Credits:
+ *   siputzx.my.id - unofficial API aggregator
  */
 
 import { ApplicationIntegrationType, InteractionContextType, SlashCommandBuilder } from 'discord.js';
@@ -27,9 +30,7 @@ const t = translate({
 async function pinterest(c) {
   const args = c.event.options.getString('query') || '';
   if (!args || args === '?') return await c.reply(t('help', {}, c));
-  const maxMatch = args.match(/(?:^|\s)-n\s+(\d+)(?:\s|$)/);
-  const limit = Math.min(Math.max(parseInt(maxMatch?.[1], 10) || 5, 1), 10);
-  args = args.replace(/(?:^|\s)-n\s+\d+(?:\s|$)/, ' ').trim();
+  const limit = 5;
   await c.react('⏳');
   try {
     const res = await fetch(`https://api.siputzx.my.id/api/s/pinterest?query=${encodeURIComponent(args)}&type=image`, {

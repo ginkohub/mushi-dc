@@ -6,6 +6,9 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/
  *
  * This code is part of Ginko project (https://github.com/ginkohub)
+ *
+ * Credits:
+ *   Wikipedia - https://wikipedia.org
  */
 
 import { ApplicationIntegrationType, InteractionContextType, SlashCommandBuilder } from 'discord.js';

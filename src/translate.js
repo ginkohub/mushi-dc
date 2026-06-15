@@ -6,6 +6,10 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/
  *
  * This code is part of Ginko project (https://github.com/ginkohub)
+ *
+ * Credits:
+ *   Google Translate - https://translate.google.com
+ *   LibreTranslate - https://libretranslate.com
  */
 
 export const translate = (translations) => {
@@ -22,7 +26,7 @@ export const translate = (translations) => {
 };
 
 async function translateGoogle(text, target, source) {
-  const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${source}&tl=${target}&dt=t&q=${encodeURIComponent(text)}`;
+    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${source}&tl=${target}&dt=t&q=${encodeURIComponent(text)}`;
   const res = await fetch(url);
   const data = await res.json();
   const translated = data[0]?.[0]?.[0];

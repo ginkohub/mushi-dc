@@ -6,10 +6,13 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/
  *
  * This code is part of Ginko project (https://github.com/ginkohub)
+ *
+ * Credits:
+ *   BMKG - https://bmkg.go.id
  */
 
 import { ApplicationIntegrationType, InteractionContextType, SlashCommandBuilder } from 'discord.js';
-import { Role, translate } from '#mushi';
+import { translate } from '#mushi';
 
 const t = translate({
   en: {

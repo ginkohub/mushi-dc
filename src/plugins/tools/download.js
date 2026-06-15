@@ -6,6 +6,10 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/
  *
  * This code is part of Ginko project (https://github.com/ginkohub)
+ *
+ * Credits:
+ *   TikWM - https://www.tikwm.com
+ *   siputzx.my.id - unofficial API aggregator
  */
 
 import { existsSync, mkdirSync } from 'node:fs';
