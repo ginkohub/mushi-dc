@@ -126,13 +126,13 @@ function timeout(ms) {
 
 const SIPUT_API = 'https://api.siputzx.my.id/api/s/youtube';
 
-async function autocomplete(m) {
+async function autocomplete(m, signal) {
   const focused = m.options.getFocused(true);
 
   if (focused.name === 'query') {
-    if (!focused.value || focused.value.length < 2) return await m.respond([]);
+    if (!focused.value || focused.value.length < 3) return [];
     const q = focused.value;
-    const siput = Browser.json(`${SIPUT_API}?query=${encodeURIComponent(q)}`).then((d) => {
+    const siput = Browser.json(`${SIPUT_API}?query=${encodeURIComponent(q)}`, { signal }).then((d) => {
       if (!d?.status || !d.data?.length) throw new Error('no siput results');
       return d.data.slice(0, 5).map((r) => ({ name: (r.title || r.name || '').substring(0, 100), value: r.url }));
     });
@@ -147,20 +147,17 @@ async function autocomplete(m) {
       });
 
     try {
-      const result = await Promise.race([siput, ytdlp, timeout(2500)]);
-      await m.respond(result).catch(() => {});
+      return await Promise.any([siput, ytdlp]);
     } catch {
-      m.respond([]).catch(() => {});
+      return [];
     }
-    return;
   }
 
   const uid = m.user.id;
   const playlists = read().playlists?.[uid] || {};
   const names = Object.keys(playlists);
   const filtered = focused.value ? names.filter((n) => n.includes(focused.value.toLowerCase())) : names;
-  const choices = filtered.slice(0, 10).map((n) => ({ name: n.slice(0, 100), value: n }));
-  await m.respond(choices).catch(() => {});
+  return filtered.slice(0, 10).map((n) => ({ name: n.slice(0, 100), value: n }));
 }
 
 const plSlash = {

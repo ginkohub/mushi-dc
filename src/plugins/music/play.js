@@ -11,7 +11,7 @@
  */
 
 import { ApplicationIntegrationType, InteractionContextType, MessageFlags, SlashCommandBuilder } from 'discord.js';
-import { Browser, Role } from '#mushi';
+import { Browser, pen, Role } from '#mushi';
 import { connect, formatDuration, getState, getYT, playSong, resolveSong } from './_player.js';
 
 async function exec(c) {
@@ -80,13 +80,12 @@ async function exec(c) {
       await c.event.editReply(msg);
     }
   } catch (err) {
-    const errMsg = `Error: ${err.message}`;
+    pen.Error('Music-Play', err);
     try {
-      await c.event.editReply(errMsg);
+      await c.event.editReply('❌');
+      await c.event.followUp({ content: `Error: ${err.message}`, flags: MessageFlags.Ephemeral });
     } catch {
-      try {
-        await c.event.followUp(errMsg);
-      } catch {}
+      /* ignore */
     }
   }
 }
@@ -97,11 +96,11 @@ function timeout(ms) {
 
 const SIPUT_API = 'https://api.siputzx.my.id/api/s/youtube';
 
-async function autocomplete(event) {
+async function autocomplete(event, signal) {
   const query = event.options.getFocused();
-  if (!query || query.length < 2) return await event.respond([]);
+  if (!query || query.length < 3) return [];
 
-  const siput = Browser.json(`${SIPUT_API}?query=${encodeURIComponent(query)}`).then((d) => {
+  const siput = Browser.json(`${SIPUT_API}?query=${encodeURIComponent(query)}`, { signal }).then((d) => {
     if (!d?.status || !d.data?.length) throw new Error('no siput results');
     return d.data.slice(0, 5).map((r) => ({ name: (r.title || r.name || '').substring(0, 100), value: r.url }));
   });
@@ -116,10 +115,9 @@ async function autocomplete(event) {
     });
 
   try {
-    const result = await Promise.race([siput, ytdlp, timeout(2500)]);
-    await event.respond(result).catch(() => {});
+    return await Promise.any([siput, ytdlp]);
   } catch {
-    event.respond([]).catch(() => {});
+    return [];
   }
 }
 
