@@ -14,9 +14,9 @@
 
 import { existsSync, mkdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { ApplicationIntegrationType, InteractionContextType, SlashCommandBuilder } from 'discord.js';
+import { ApplicationIntegrationType, InteractionContextType, MessageFlags, SlashCommandBuilder } from 'discord.js';
 import YtDlpWrap from 'yt-dlp-wrap';
-import { Browser, Role } from '#mushi';
+import { Browser, pen, Role } from '#mushi';
 
 const BIN_DIR = resolve('./bin');
 const YTDLP_PATHS = [
@@ -69,13 +69,29 @@ async function downloadTikTok(url) {
 async function downloadInstagram(url) {
   const shortcodeMatch = url.match(/\/(p|reel|tv)\/([A-Za-z0-9_-]+)/);
   if (!shortcodeMatch) throw new Error('Invalid Instagram URL');
-  const data = await Browser.json(`https://api.siputzx.my.id/api/s/instagram?url=${encodeURIComponent(url)}`);
-  if (!data?.status || !data.data?.length) throw new Error('Instagram: no media found');
-  const item = data.data[0];
+  const json = await Browser.json(`https://api.siputzx.my.id/api/d/fastdl?url=${encodeURIComponent(url)}`);
+  if (!json?.status || !json.data) throw new Error('Instagram: no media found');
+
+  const data = json.data;
+  const meta = data.meta || {};
+  let mediaUrl = '';
+  let type = 'video';
+
+  if (Array.isArray(data.url) && data.url.length > 0) {
+    mediaUrl = data.url[0].url;
+    type = data.url[0].type === 'mp4' ? 'video' : 'image';
+  } else {
+    mediaUrl = data.hd || data.sd || data.url || data.thumb;
+  }
+
+  if (typeof mediaUrl !== 'string') {
+    throw new Error(`Instagram: could not find valid media URL (found ${typeof mediaUrl})`);
+  }
+
   return {
     platform: 'Instagram',
-    title: item.caption || 'Instagram',
-    media: { url: item.url, type: item.type || 'video' },
+    title: meta.title || 'Instagram',
+    media: { url: mediaUrl, type },
   };
 }
 
@@ -87,11 +103,18 @@ async function download(c) {
   if (urls.length === 0) {
     const ref = c.event.reference;
     if (ref?.messageId) {
-      const replied = await c.event.channel.messages.fetch(ref.messageId);
-      urls = replied.content?.match(/https?:\/\/[^\s]+/g) || [];
+      try {
+        const replied = await c.event.channel.messages.fetch(ref.messageId);
+        urls = replied.content?.match(/https?:\/\/[^\s]+/g) || [];
+      } catch {}
     }
   }
-  if (urls.length === 0) return await c.react('❌');
+
+  if (urls.length === 0) {
+    return await c.reply({ content: '❌ No URLs found.', flags: MessageFlags.Ephemeral });
+  }
+
+  await c.event.deferReply();
 
   for (const url of urls) {
     if (YTDLP_SITES.test(url)) {
@@ -122,8 +145,9 @@ async function download(c) {
         } else {
           await c.reply(lines);
         }
-      } catch {
-        await c.react('❌');
+      } catch (e) {
+        pen.Error('Download-YTDLP', e);
+        await c.reply({ content: `❌ Failed to download from ${url}`, flags: MessageFlags.Ephemeral });
       }
       continue;
     }
@@ -146,7 +170,7 @@ async function download(c) {
 
       const lines = [`**${result.platform}**`, result.title && `Title: ${result.title}`].filter(Boolean).join('\n');
       const mediaUrl = result.media?.url;
-      if (mediaUrl) {
+      if (mediaUrl && typeof mediaUrl === 'string') {
         const res = await Browser.get(mediaUrl);
         if (res.ok) {
           const buf = Buffer.from(await res.arrayBuffer());
@@ -160,11 +184,14 @@ async function download(c) {
         } else {
           await c.reply(`${lines}\nURL: ${mediaUrl}`);
         }
+      } else if (mediaUrl) {
+        throw new Error(`Invalid media URL type: ${typeof mediaUrl}`);
       } else {
         await c.reply(lines);
       }
-    } catch {
-      await c.react('❌');
+    } catch (e) {
+      pen.Error('Download-Direct', e);
+      await c.reply({ content: `❌ Error downloading ${url}: ${e.message}`, flags: MessageFlags.Ephemeral });
     }
   }
 }
