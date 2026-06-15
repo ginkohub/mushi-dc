@@ -24,7 +24,6 @@ const MODELS = {
 };
 
 const MODEL_NAMES = Object.keys(MODELS);
-const modelListStr = () => MODEL_NAMES.join(', ');
 
 const t = translate({
   en: {
@@ -127,14 +126,6 @@ function splitText(text, maxLen = 2000) {
   return chunks;
 }
 
-async function replyOrEdit(c, text) {
-  const chunks = splitText(text);
-  for (const chunk of chunks) {
-    const msg = await c.reply(chunk);
-    if (msg?.id) aiMessages.add(msg.id);
-  }
-}
-
 async function callApi(model, prompt, system, temperature) {
   const cfg = MODELS[model];
   if (!cfg) return { status: false, error: `Unknown model: ${model}` };
@@ -153,9 +144,63 @@ async function callApi(model, prompt, system, temperature) {
   return { status: true, text };
 }
 
+const chatExec = async (c) => {
+  const query = c.event.options.getString('text');
+  const channelId = c.event.channel?.id || c.event.user?.id;
+  await c.event.deferReply();
+  try {
+    const text = await processQuery(query, channelId);
+    if (!text) {
+      await c.event.editReply('❌');
+      return;
+    }
+    const chunks = splitText(text);
+    for (let i = 0; i < chunks.length; i++) {
+      if (i === 0) await c.event.editReply(chunks[i]);
+      else await c.event.followUp(chunks[i]);
+    }
+  } catch {
+    await c.event.editReply('❌');
+  }
+};
+
+const configExec = async (c) => {
+  const sub = c.event.options.getSubcommand();
+  const settings = loadSettings();
+  if (sub === 'model') {
+    const model = c.event.options.getString('name');
+    settings.model = model;
+    saveSettings(settings);
+    channels.delete(c.event.channel?.id || c.event.user?.id);
+    await c.reply(t('model_set', { model }, c));
+  } else if (sub === 'prompt') {
+    const prompt = c.event.options.getString('text');
+    const data = read();
+    if (!data.settings) data.settings = {};
+    data.settings.systemPrompt = prompt;
+    write(data);
+    await c.reply(t('prompt_set', {}, c));
+  } else if (sub === 'temp') {
+    const val = c.event.options.getNumber('value');
+    settings.temperature = val;
+    saveSettings(settings);
+    await c.reply(t('temp_set', { temp: val }, c));
+  } else if (sub === 'clear') {
+    const ch = c.event.channel?.id || c.event.user?.id;
+    channels.delete(ch);
+    await c.reply(t('cleared', {}, c));
+  }
+};
+
+const baseCtx = (name) =>
+  new SlashCommandBuilder()
+    .setName(name)
+    .setIntegrationTypes(ApplicationIntegrationType.GuildInstall, ApplicationIntegrationType.UserInstall)
+    .setContexts(InteractionContextType.Guild, InteractionContextType.BotDM, InteractionContextType.PrivateChannel);
+
 export default [
   {
-    roles: [Role.USER],
+    roles: [Role.GUEST],
     exec: async (c) => {
       const msg = c.event;
       if (!msg.author || msg.author.id === c.client()?.user?.id) return;
@@ -173,15 +218,21 @@ export default [
     },
   },
   {
-    data: new SlashCommandBuilder()
-      .setName('ai')
+    roles: [Role.GUEST],
+    data: baseCtx('ai')
       .setDescription('Chat with AI')
       .addSubcommand((s) =>
         s
           .setName('chat')
           .setDescription('Send a message to the AI')
           .addStringOption((o) => o.setName('text').setDescription('Your message').setRequired(true)),
-      )
+      ),
+    exec: chatExec,
+  },
+  {
+    roles: [Role.USER],
+    data: baseCtx('aiset')
+      .setDescription('Configure AI settings')
       .addSubcommand((s) =>
         s
           .setName('model')
@@ -208,53 +259,7 @@ export default [
             o.setName('value').setDescription('Temperature value').setRequired(true).setMinValue(0).setMaxValue(2),
           ),
       )
-      .addSubcommand((s) => s.setName('clear').setDescription('Clear conversation history'))
-      .setIntegrationTypes(ApplicationIntegrationType.GuildInstall, ApplicationIntegrationType.UserInstall)
-      .setContexts(InteractionContextType.Guild, InteractionContextType.BotDM, InteractionContextType.PrivateChannel),
-    exec: async (c) => {
-      const sub = c.event.options.getSubcommand();
-      const settings = loadSettings();
-      if (sub === 'chat') {
-        const query = c.event.options.getString('text');
-        const channelId = c.event.channel?.id || c.event.user?.id;
-        await c.event.deferReply();
-        try {
-          const text = await processQuery(query, channelId);
-          if (!text) {
-            await c.event.editReply('❌');
-            return;
-          }
-          const chunks = splitText(text);
-          for (let i = 0; i < chunks.length; i++) {
-            if (i === 0) await c.event.editReply(chunks[i]);
-            else await c.event.followUp(chunks[i]);
-          }
-        } catch {
-          await c.event.editReply('❌');
-        }
-      } else if (sub === 'model') {
-        const model = c.event.options.getString('name');
-        settings.model = model;
-        saveSettings(settings);
-        channels.delete(c.event.channel?.id || c.event.user?.id);
-        await c.reply(t('model_set', { model }, c));
-      } else if (sub === 'prompt') {
-        const prompt = c.event.options.getString('text');
-        const data = read();
-        if (!data.settings) data.settings = {};
-        data.settings.systemPrompt = prompt;
-        write(data);
-        await c.reply(t('prompt_set', {}, c));
-      } else if (sub === 'temp') {
-        const val = c.event.options.getNumber('value');
-        settings.temperature = val;
-        saveSettings(settings);
-        await c.reply(t('temp_set', { temp: val }, c));
-      } else if (sub === 'clear') {
-        const ch = c.event.channel?.id || c.event.user?.id;
-        channels.delete(ch);
-        await c.reply(t('cleared', {}, c));
-      }
-    },
+      .addSubcommand((s) => s.setName('clear').setDescription('Clear conversation history')),
+    exec: configExec,
   },
 ];
