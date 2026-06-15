@@ -67,6 +67,12 @@ export class Handler {
     /** @type {Map<string, Function>} */
     this.autoc = new Map();
 
+    /** @type {Map<string, { timer: NodeJS.Timeout, controller: AbortController }>} */
+    this.debounceAutoc = new Map();
+
+    /** @type {Map<string, { results: any[], expires: number }>} */
+    this.autocCache = new Map();
+
     /** @type {Array} */
     this.watchID = [];
 
@@ -392,6 +398,66 @@ export class Handler {
   }
 
   /**
+   * Handle autocomplete event with debouncing, cancellation, and caching
+   * @param {import('discord.js').AutocompleteInteraction} event
+   */
+  async handleAutocomplete(event) {
+    const fn = this.autoc.get(event.commandName);
+    if (!fn) return;
+
+    const focused = event.options.getFocused();
+    const userId = event.user.id;
+    const cacheKey = `${userId}-${event.commandName}-${focused}`;
+
+    // Check cache (1 minute expiry)
+    if (this.autocCache.has(cacheKey)) {
+      const { results, expires } = this.autocCache.get(cacheKey);
+      if (Date.now() < expires) {
+        return await event.respond(results).catch(() => {});
+      }
+      this.autocCache.delete(cacheKey);
+    }
+
+    const key = `${userId}-${event.commandName}`;
+
+    if (this.debounceAutoc.has(key)) {
+      const { timer, controller } = this.debounceAutoc.get(key);
+      clearTimeout(timer);
+      controller.abort();
+    }
+
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      try {
+        const results = await fn(event, controller.signal);
+        if (results && !controller.signal.aborted) {
+          await event.respond(results).catch(() => {});
+          // Cache results for 1 minute
+          this.autocCache.set(cacheKey, { results, expires: Date.now() + 60_000 });
+
+          // Cleanup old cache entries
+          if (this.autocCache.size > 1000) {
+            const now = Date.now();
+            for (const [k, v] of this.autocCache) {
+              if (v.expires < now) this.autocCache.delete(k);
+            }
+          }
+        }
+      } catch (e) {
+        if (e.name !== 'AbortError') {
+          this.pen.Error('autocomplete', e);
+        }
+      } finally {
+        if (this.debounceAutoc.get(key)?.timer === timer) {
+          this.debounceAutoc.delete(key);
+        }
+      }
+    }, 1000);
+
+    this.debounceAutoc.set(key, { timer, controller });
+  }
+
+  /**
    * Handle event and passed it to all plugins whether it is a command or a listener
    * @param {{event: import('discord.js').Message, oldEvent: import('discord.js').Message, eventType: string, eventName: string}}
    */
@@ -400,8 +466,7 @@ export class Handler {
       if (event?.author?.bot) return;
 
       if (event?.isAutocomplete?.()) {
-        const fn = this.autoc.get(event.commandName);
-        if (fn) await fn(event);
+        await this.handleAutocomplete(event);
         return;
       }
 
