@@ -1,3 +1,17 @@
+/**
+ * Copyright (C) 2025 Ginko
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/
+ *
+ * This code is part of Ginko project (https://github.com/ginkohub)
+ *
+ * Credits:
+ *   yt-dlp - https://github.com/yt-dlp/yt-dlp
+ *   ffmpeg - https://ffmpeg.org
+ */
+
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
