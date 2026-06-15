@@ -11,7 +11,7 @@
  */
 
 import { ApplicationIntegrationType, InteractionContextType, MessageFlags, SlashCommandBuilder } from 'discord.js';
-import { Role } from '#mushi';
+import { Browser, Role } from '#mushi';
 import { connect, formatDuration, getState, getYT, playSong, resolveSong } from './_player.js';
 
 async function exec(c) {
@@ -101,14 +101,10 @@ async function autocomplete(event) {
   const query = event.options.getFocused();
   if (!query || query.length < 2) return await event.respond([]);
 
-  const siput = fetch(`${SIPUT_API}?query=${encodeURIComponent(query)}`, {
-    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:137.0) Gecko/20100101 Firefox/137.0' },
-  })
-    .then((r) => r.json())
-    .then((d) => {
-      if (!d?.status || !d.data?.length) throw new Error('no siput results');
-      return d.data.slice(0, 5).map((r) => ({ name: (r.title || r.name || '').substring(0, 100), value: r.url }));
-    });
+  const siput = Browser.json(`${SIPUT_API}?query=${encodeURIComponent(query)}`).then((d) => {
+    if (!d?.status || !d.data?.length) throw new Error('no siput results');
+    return d.data.slice(0, 5).map((r) => ({ name: (r.title || r.name || '').substring(0, 100), value: r.url }));
+  });
 
   const ytdlp = getYT()
     .then((yt) => Promise.race([yt.search(query, 5), timeout(2000)]))

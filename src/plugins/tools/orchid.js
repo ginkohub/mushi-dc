@@ -12,7 +12,7 @@
  */
 
 import { ApplicationIntegrationType, InteractionContextType, SlashCommandBuilder } from 'discord.js';
-import { Role } from '#mushi';
+import { Browser, Role } from '#mushi';
 
 async function orchid(c) {
   if (c.isSlash) {
@@ -26,12 +26,9 @@ async function orchid(c) {
   const query = args.replace(/(?:^|\s)(?:-n|--max)\s+\d+(?:\s|$)/, ' ').trim();
   if (!query) return await c.react('❌');
   try {
-    const res = await fetch(
+    const data = await Browser.json(
       `https://api.crossref.org/works?query=${encodeURIComponent(query)}&rows=${maxRows}&sort=relevance`,
-      { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:137.0) Gecko/20100101 Firefox/137.0' } },
     );
-    if (!res.ok) return await c.reply('Search failed.');
-    const data = await res.json();
     const items = data.message?.items;
     if (!items?.length) return await c.reply('No results.');
     const top = items.slice(0, maxRows);

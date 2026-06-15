@@ -9,7 +9,6 @@
  */
 
 import { ApplicationIntegrationType, InteractionContextType, SlashCommandBuilder } from 'discord.js';
-import { Role } from '#mushi';
 
 const ago = (ms) => {
   const s = Math.floor(ms / 1000);

@@ -16,7 +16,7 @@ import { existsSync, mkdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { ApplicationIntegrationType, InteractionContextType, SlashCommandBuilder } from 'discord.js';
 import YtDlpWrap from 'yt-dlp-wrap';
-import { Role } from '#mushi';
+import { Browser, Role } from '#mushi';
 
 const BIN_DIR = resolve('./bin');
 const YTDLP_PATHS = [
@@ -48,9 +48,7 @@ const YTDLP_SITES = /youtube\.com|youtu\.be|soundcloud\.com|twitter\.com|x\.com|
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
 async function downloadTikTok(url) {
-  const res = await fetch(`https://www.tikwm.com/api/?url=${encodeURIComponent(url)}`);
-  if (!res.ok) throw new Error('TikTok API error');
-  const data = await res.json();
+  const data = await Browser.json(`https://www.tikwm.com/api/?url=${encodeURIComponent(url)}`);
   if (data.code !== 0) throw new Error(data.msg || 'TikTok API error');
   const video = data.data;
   const images = video.images || video.image_post_info?.images || [];
@@ -71,8 +69,7 @@ async function downloadTikTok(url) {
 async function downloadInstagram(url) {
   const shortcodeMatch = url.match(/\/(p|reel|tv)\/([A-Za-z0-9_-]+)/);
   if (!shortcodeMatch) throw new Error('Invalid Instagram URL');
-  const res = await fetch(`https://api.siputzx.my.id/api/s/instagram?url=${encodeURIComponent(url)}`);
-  const data = await res.json();
+  const data = await Browser.json(`https://api.siputzx.my.id/api/s/instagram?url=${encodeURIComponent(url)}`);
   if (!data?.status || !data.data?.length) throw new Error('Instagram: no media found');
   const item = data.data[0];
   return {
@@ -138,8 +135,7 @@ async function download(c) {
       } else if (/instagram\.com/.test(url)) {
         result = await downloadInstagram(url);
       } else {
-        const res = await fetch(`https://api.siputzx.my.id/api/s/facebook?url=${encodeURIComponent(url)}`);
-        const data = await res.json();
+        const data = await Browser.json(`https://api.siputzx.my.id/api/s/facebook?url=${encodeURIComponent(url)}`);
         if (data?.status && data.data?.length) {
           const item = data.data[0];
           result = { platform: 'Unknown', title: item.title || 'Media', media: { url: item.url, type: 'video' } };
@@ -151,7 +147,7 @@ async function download(c) {
       const lines = [`**${result.platform}**`, result.title && `Title: ${result.title}`].filter(Boolean).join('\n');
       const mediaUrl = result.media?.url;
       if (mediaUrl) {
-        const res = await fetch(mediaUrl);
+        const res = await Browser.get(mediaUrl);
         if (res.ok) {
           const buf = Buffer.from(await res.arrayBuffer());
           if (!allowLarge && buf.length > MAX_FILE_SIZE) {

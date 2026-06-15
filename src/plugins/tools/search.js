@@ -12,7 +12,7 @@
  */
 
 import { ApplicationIntegrationType, InteractionContextType, SlashCommandBuilder } from 'discord.js';
-import { Role, translate } from '#mushi';
+import { Browser, Role, translate } from '#mushi';
 
 const API = 'https://api.siputzx.my.id/api/s';
 
@@ -52,10 +52,7 @@ async function search(c) {
     const query = parts.slice(1).join(' ');
 
     if (engine === 'yt' && query) {
-      const res = await fetch(`${API}/youtube?query=${encodeURIComponent(query)}`, {
-        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:137.0) Gecko/20100101 Firefox/137.0' },
-      });
-      const data = await res.json();
+      const data = await Browser.json(`${API}/youtube?query=${encodeURIComponent(query)}`);
       if (!data?.status || !data.data?.length) return await c.reply(t('not_found', {}, c));
       const items = data.data.slice(0, limit);
       const lines = items.map((i) => t('yt_result', { title: i.title || i.name, url: i.url }, c));
@@ -63,10 +60,7 @@ async function search(c) {
     }
 
     if (engine === 'gsm' && query) {
-      const res = await fetch(`${API}/gsmarena?query=${encodeURIComponent(query)}`, {
-        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:137.0) Gecko/20100101 Firefox/137.0' },
-      });
-      const data = await res.json();
+      const data = await Browser.json(`${API}/gsmarena?query=${encodeURIComponent(query)}`);
       if (!data?.status || !data.data?.length) return await c.reply(t('not_found', {}, c));
       const items = data.data.slice(0, limit);
       const lines = items.map((i) =>
@@ -75,10 +69,7 @@ async function search(c) {
       return await c.reply(lines.join('\n\n'));
     }
 
-    const res = await fetch(`${API}/duckduckgo?query=${encodeURIComponent(args)}`, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:137.0) Gecko/20100101 Firefox/137.0' },
-    });
-    const data = await res.json();
+    const data = await Browser.json(`${API}/duckduckgo?query=${encodeURIComponent(args)}`);
     if (!data?.status || !data.data?.results?.length) return await c.reply(t('not_found', {}, c));
     const items = data.data.results.slice(0, limit);
     const lines = items.map((i) => `[${i.title}](${i.url})\n${i.snippet}`);

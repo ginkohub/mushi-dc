@@ -12,7 +12,7 @@
  */
 
 import { ApplicationIntegrationType, InteractionContextType, SlashCommandBuilder } from 'discord.js';
-import { pen, Role, searchWiki } from '#mushi';
+import { Browser, pen, Role, searchWiki } from '#mushi';
 
 const WIKI_API = 'https://en.wikipedia.org/w/api.php';
 
@@ -20,10 +20,9 @@ async function autoQuery(m) {
   const query = m.options.getFocused();
   if (!query || query.length < 2) return await m.respond([]);
   try {
-    const res = await fetch(
+    const data = await Browser.json(
       `${WIKI_API}?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&srlimit=10`,
     );
-    const data = await res.json();
     const choices = (data.query?.search || []).map((p) => ({ name: p.title.slice(0, 100), value: p.title }));
     await m.respond(choices);
   } catch (e) {

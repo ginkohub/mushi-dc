@@ -12,6 +12,8 @@
  *   LibreTranslate - https://libretranslate.com
  */
 
+import { Browser } from './browser.js';
+
 export const translate = (translations) => {
   return (key, variables = {}, context = {}) => {
     const lang = context.lang || 'en';
@@ -27,11 +29,14 @@ export const translate = (translations) => {
 
 async function translateGoogle(text, target, source) {
   const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${source}&tl=${target}&dt=t&q=${encodeURIComponent(text)}`;
-  const res = await fetch(url);
-  const data = await res.json();
-  const translated = data[0]?.[0]?.[0];
-  if (!translated) throw new Error('Empty response from Google Translate');
-  return translated;
+  try {
+    const data = await Browser.json(url);
+    const translated = data[0]?.[0]?.[0];
+    if (!translated) throw new Error('Empty response from Google Translate');
+    return translated;
+  } catch (e) {
+    throw new Error(`Google Translate failed: ${e.message}`);
+  }
 }
 
 const LIBRE_INSTANCES = [
@@ -50,16 +55,11 @@ async function translateLibre(text, target, source, urls, apiKey) {
 
   for (const url of list) {
     try {
-      const res = await fetch(`${url}/translate`, {
+      const data = await Browser.json(`${url}/translate`, {
         method: 'POST',
         headers,
         body,
       });
-      if (!res.ok) {
-        errors.push(`${url}: ${res.status}`);
-        continue;
-      }
-      const data = await res.json();
       return data.translatedText;
     } catch (e) {
       errors.push(`${url}: ${e.message}`);

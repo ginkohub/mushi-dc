@@ -9,7 +9,6 @@
  */
 
 import { ApplicationIntegrationType, InteractionContextType, SlashCommandBuilder } from 'discord.js';
-import { Role } from '#mushi';
 
 async function serverInfo(c) {
   const guild = c.event.guild;

@@ -11,6 +11,8 @@
  *   Open-Meteo - https://open-meteo.com
  */
 
+import { Browser } from '#mushi';
+
 const weatherCodes = {
   0: 'Clear sky',
   1: 'Mainly clear',
@@ -31,29 +33,29 @@ const weatherCodes = {
 };
 
 export async function getWeather(city) {
-  const geo = await (
-    await fetch(
+  try {
+    const geo = await Browser.json(
       `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=en&format=json`,
-    )
-  ).json();
+    );
 
-  if (!geo.results?.length) return null;
+    if (!geo.results?.length) return null;
 
-  const { latitude, longitude, name, country } = geo.results[0];
+    const { latitude, longitude, name, country } = geo.results[0];
 
-  const w = await (
-    await fetch(
+    const w = await Browser.json(
       `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m`,
-    )
-  ).json();
+    );
 
-  const current = w.current;
+    const current = w.current;
 
-  return {
-    location: `${name}, ${country}`,
-    temp: current.temperature_2m,
-    condition: weatherCodes[current.weather_code] || 'Unknown',
-    humidity: current.relative_humidity_2m,
-    wind: current.wind_speed_10m,
-  };
+    return {
+      location: `${name}, ${country}`,
+      temp: current.temperature_2m,
+      condition: weatherCodes[current.weather_code] || 'Unknown',
+      humidity: current.relative_humidity_2m,
+      wind: current.wind_speed_10m,
+    };
+  } catch {
+    return null;
+  }
 }

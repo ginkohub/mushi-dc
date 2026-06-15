@@ -25,7 +25,7 @@ async function speedtest(c) {
       const now = Date.now();
       if (now - lastEdit < 2000) return;
       lastEdit = now;
-      msg.edit(`${label}... ${s.toFixed(2)} Mbps`).catch(() => { });
+      msg.edit(`${label}... ${s.toFixed(2)} Mbps`).catch(() => {});
     };
     const dl = await service.testDownload(server, onProgress('Downloading'));
     const ul = await service.testUpload(server, onProgress('Uploading'));

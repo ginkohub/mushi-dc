@@ -9,7 +9,7 @@
  */
 
 import { ApplicationIntegrationType, InteractionContextType, SlashCommandBuilder } from 'discord.js';
-import { Role, translate } from '#mushi';
+import { translate } from '#mushi';
 
 const t = translate({
   en: {

@@ -12,7 +12,7 @@
  */
 
 import { ApplicationIntegrationType, InteractionContextType, SlashCommandBuilder } from 'discord.js';
-import { translate } from '#mushi';
+import { Browser, translate } from '#mushi';
 
 const t = translate({
   en: {
@@ -48,17 +48,21 @@ const t = translate({
 });
 
 async function fetchLatest() {
-  const res = await fetch('https://data.bmkg.go.id/DataMKG/TEWS/autogempa.json');
-  if (!res.ok) return null;
-  const data = await res.json();
-  return data.Infogempa?.gempa || null;
+  try {
+    const data = await Browser.json('https://data.bmkg.go.id/DataMKG/TEWS/autogempa.json');
+    return data.Infogempa?.gempa || null;
+  } catch {
+    return null;
+  }
 }
 
 async function fetchRecent() {
-  const res = await fetch('https://data.bmkg.go.id/DataMKG/TEWS/gempaterkini.json');
-  if (!res.ok) return null;
-  const data = await res.json();
-  return data.Infogempa?.gempa || [];
+  try {
+    const data = await Browser.json('https://data.bmkg.go.id/DataMKG/TEWS/gempaterkini.json');
+    return data.Infogempa?.gempa || [];
+  } catch {
+    return [];
+  }
 }
 
 async function latestQuake(c) {

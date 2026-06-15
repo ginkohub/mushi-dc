@@ -12,7 +12,7 @@
  */
 
 import { ApplicationIntegrationType, InteractionContextType, SlashCommandBuilder } from 'discord.js';
-import { Role } from '#mushi';
+import { Browser } from '#mushi';
 
 const searchCache = new Map();
 
@@ -20,9 +20,7 @@ async function searchIMDb(c) {
   const query = (c.args || '').trim();
   if (!query) return await c.react('❌');
   try {
-    const res = await fetch(`https://v3.sg.media-imdb.com/suggestion/x/${encodeURIComponent(query)}.json`);
-    if (!res.ok) return await c.reply('Search failed.');
-    const data = await res.json();
+    const data = await Browser.json(`https://v3.sg.media-imdb.com/suggestion/x/${encodeURIComponent(query)}.json`);
     const results = data.d?.filter((r) => r.id?.startsWith('tt')) || [];
     if (results.length === 0) return await c.reply('No results.');
     const top = results.slice(0, 5);
@@ -52,10 +50,7 @@ export default [
       if (!results || num > results.length) return;
       const item = results[num - 1];
       try {
-        const page = await fetch(`https://www.imdb.com/title/${item.id}/`, {
-          headers: { 'User-Agent': 'Mozilla/5.0' },
-        });
-        const html = await page.text();
+        const html = await Browser.getText(`https://www.imdb.com/title/${item.id}/`);
         const ldMatch = html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/);
         const ld = ldMatch ? JSON.parse(ldMatch[1]) : {};
         const rating = ld.aggregateRating?.ratingValue || 'N/A';

@@ -12,7 +12,7 @@
 
 import * as cheerio from 'cheerio';
 import { ApplicationIntegrationType, InteractionContextType, SlashCommandBuilder } from 'discord.js';
-import { Role } from '#mushi';
+import { Browser, Role } from '#mushi';
 import { getState } from './_player.js';
 
 async function exec(c) {
@@ -33,10 +33,7 @@ async function exec(c) {
   await c.event.deferReply();
 
   try {
-    const searchRes = await fetch(`https://genius.com/api/search/song?q=${encodeURIComponent(title)}`, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:137.0) Gecko/20100101 Firefox/137.0' },
-    });
-    const searchData = await searchRes.json();
+    const searchData = await Browser.json(`https://genius.com/api/search/song?q=${encodeURIComponent(title)}`);
 
     const hits = searchData?.response?.hits;
     if (!hits || hits.length === 0) {
@@ -45,10 +42,7 @@ async function exec(c) {
     }
 
     const hit = hits[0].result;
-    const pageRes = await fetch(hit.url, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:137.0) Gecko/20100101 Firefox/137.0' },
-    });
-    const html = await pageRes.text();
+    const html = await Browser.getText(hit.url);
     const $ = cheerio.load(html);
 
     let lyrics = '';
@@ -90,10 +84,7 @@ async function autocomplete(m) {
   const query = m.options.getFocused();
   if (!query || query.length < 2) return await m.respond([]);
   try {
-    const res = await fetch(`https://genius.com/api/search/song?q=${encodeURIComponent(query)}`, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:137.0) Gecko/20100101 Firefox/137.0' },
-    });
-    const data = await res.json();
+    const data = await Browser.json(`https://genius.com/api/search/song?q=${encodeURIComponent(query)}`);
     const choices = (data.response?.hits || []).slice(0, 10).map((h) => ({
       name: h.result.title.slice(0, 100),
       value: h.result.title,

@@ -11,24 +11,26 @@
  *   Wikipedia - https://wikipedia.org
  */
 
+import { Browser } from '#mushi';
+
 export async function searchWiki(query, lang = 'en') {
-  const search = await (
-    await fetch(
+  try {
+    const search = await Browser.json(
       `https://${lang}.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&srlimit=1`,
-    )
-  ).json();
+    );
 
-  const page = search?.query?.search?.[0];
-  if (!page) return null;
+    const page = search?.query?.search?.[0];
+    if (!page) return null;
 
-  const extract = await (
-    await fetch(
+    const extract = await Browser.json(
       `https://${lang}.wikipedia.org/w/api.php?action=query&prop=extracts&exintro&explaintext&exsentences=5&pageids=${page.pageid}&format=json`,
-    )
-  ).json();
+    );
 
-  const text = extract?.query?.pages?.[page.pageid]?.extract?.trim();
-  const url = `https://${lang}.wikipedia.org/wiki/${encodeURIComponent(page.title)}`;
+    const text = extract?.query?.pages?.[page.pageid]?.extract?.trim();
+    const url = `https://${lang}.wikipedia.org/wiki/${encodeURIComponent(page.title)}`;
 
-  return { title: page.title, text, url };
+    return { title: page.title, text, url };
+  } catch {
+    return null;
+  }
 }

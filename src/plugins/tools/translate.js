@@ -9,18 +9,7 @@
  */
 
 import { ApplicationIntegrationType, InteractionContextType, SlashCommandBuilder } from 'discord.js';
-import { Role, read, translate, translateText, write } from '#mushi';
-
-const t = translate({
-  en: {
-    usage:
-      "Usage: `/translate text [lang] <text>` — translate text\n       `/translate auto <lang> <user>` — auto-translate user's messages",
-  },
-  id: {
-    usage:
-      'Penggunaan: `/translate text [lang] <teks>` — terjemahkan teks\n       `/translate auto <lang> <user>` — auto-translate pesan user',
-  },
-});
+import { read, translateText, write } from '#mushi';
 
 const LANGUAGES = [
   { name: 'Afrikaans', value: 'af' },
@@ -126,7 +115,7 @@ export default [
         if (channel) {
           await channel.send(`**${msg.author.username}**: ${translated}`);
         }
-      } catch { }
+      } catch {}
     },
   },
   {

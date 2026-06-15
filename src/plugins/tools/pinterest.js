@@ -12,7 +12,7 @@
  */
 
 import { ApplicationIntegrationType, InteractionContextType, SlashCommandBuilder } from 'discord.js';
-import { Role, translate } from '#mushi';
+import { Browser, Role, translate } from '#mushi';
 
 const t = translate({
   en: {
@@ -33,14 +33,9 @@ async function pinterest(c) {
   const limit = 5;
   await c.react('⏳');
   try {
-    const res = await fetch(`https://api.siputzx.my.id/api/s/pinterest?query=${encodeURIComponent(args)}&type=image`, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:137.0) Gecko/20100101 Firefox/137.0' },
-    });
-    if (!res.ok) {
-      await c.react('❌');
-      return;
-    }
-    const data = await res.json();
+    const data = await Browser.json(
+      `https://api.siputzx.my.id/api/s/pinterest?query=${encodeURIComponent(args)}&type=image`,
+    );
     if (!data?.status || !data.data?.length) return await c.reply(t('not_found', { query: args }, c));
     const items = data.data.slice(0, limit);
     await c.reply({

@@ -12,7 +12,7 @@
  */
 
 import { ApplicationIntegrationType, InteractionContextType, SlashCommandBuilder } from 'discord.js';
-import { Role, read, translate, write } from '#mushi';
+import { Browser, Role, read, translate, write } from '#mushi';
 
 const BASE = 'https://api.siputzx.my.id/api/ai';
 
@@ -134,14 +134,16 @@ async function callApi(model, prompt, system, temperature) {
   if (system && cfg.systemKey) params.set(cfg.systemKey, system);
   if (temperature != null && cfg.tempKey) params.set(cfg.tempKey, String(temperature));
   const url = `${BASE}/${model}?${params.toString()}`;
-  const res = await fetch(url);
-  if (!res.ok) return { status: false, error: `API error: ${res.status}` };
-  const json = await res.json();
-  if (!json.status) return { status: false, error: 'API returned error' };
-  const data = json.data;
-  let text = data.response || data.message || data.content || '';
-  text = text.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
-  return { status: true, text };
+  try {
+    const json = await Browser.json(url);
+    if (!json.status) return { status: false, error: 'API returned error' };
+    const data = json.data;
+    let text = data.response || data.message || data.content || '';
+    text = text.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+    return { status: true, text };
+  } catch (e) {
+    return { status: false, error: e.message };
+  }
 }
 
 const chatExec = async (c) => {
@@ -214,7 +216,7 @@ export default [
         if (!text) return;
         const sent = await msg.reply(text);
         if (sent?.id) aiMessages.add(sent.id);
-      } catch { }
+      } catch {}
     },
   },
   {

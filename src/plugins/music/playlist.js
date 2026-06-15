@@ -11,7 +11,7 @@
  */
 
 import { ApplicationIntegrationType, InteractionContextType, SlashCommandBuilder } from 'discord.js';
-import { Role, read, write } from '#mushi';
+import { Browser, Role, read, write } from '#mushi';
 import { connect, formatDuration, getState, getYT, playSong, resolveSong } from './_player.js';
 
 function getPlaylists() {
@@ -132,14 +132,10 @@ async function autocomplete(m) {
   if (focused.name === 'query') {
     if (!focused.value || focused.value.length < 2) return await m.respond([]);
     const q = focused.value;
-    const siput = fetch(`${SIPUT_API}?query=${encodeURIComponent(q)}`, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:137.0) Gecko/20100101 Firefox/137.0' },
-    })
-      .then((r) => r.json())
-      .then((d) => {
-        if (!d?.status || !d.data?.length) throw new Error('no siput results');
-        return d.data.slice(0, 5).map((r) => ({ name: (r.title || r.name || '').substring(0, 100), value: r.url }));
-      });
+    const siput = Browser.json(`${SIPUT_API}?query=${encodeURIComponent(q)}`).then((d) => {
+      if (!d?.status || !d.data?.length) throw new Error('no siput results');
+      return d.data.slice(0, 5).map((r) => ({ name: (r.title || r.name || '').substring(0, 100), value: r.url }));
+    });
 
     const ytdlp = getYT()
       .then((yt) => Promise.race([yt.search(q, 5), timeout(2000)]))

@@ -13,7 +13,7 @@
 
 import * as cheerio from 'cheerio';
 import { ApplicationIntegrationType, InteractionContextType, SlashCommandBuilder } from 'discord.js';
-import { pen, Role } from '#mushi';
+import { Browser, pen } from '#mushi';
 
 const SEARCH_API = 'https://api.siputzx.my.id/api/s/duckduckgo';
 
@@ -55,10 +55,7 @@ async function readArticle(c) {
   if (!url) return await c.react('❌');
   await c.react('⏳');
   try {
-    const response = await fetch(url, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:137.0) Gecko/20100101 Firefox/137.0' },
-    });
-    const html = await response.text();
+    const html = await Browser.getText(url);
     const $ = cheerio.load(html);
     const title =
       $('meta[property="og:title"]').attr('content') ||
@@ -110,10 +107,7 @@ async function searchPosts(c) {
   if (!query) return await c.react('❌');
   await c.react('⏳');
   try {
-    const res = await fetch(`${SEARCH_API}?query=${encodeURIComponent(`site:substack.com ${query}`)}`, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:137.0) Gecko/20100101 Firefox/137.0' },
-    });
-    const data = await res.json();
+    const data = await Browser.json(`${SEARCH_API}?query=${encodeURIComponent(`site:substack.com ${query}`)}`);
     if (!data?.status || !data.data?.results?.length) return await c.reply('No results found.');
     const items = data.data.results.slice(0, 5);
     const lines = items.map((r, i) => `**${i + 1}.** [${r.title}](${r.url})\n${r.snippet}`);
@@ -129,10 +123,7 @@ async function autoStack(m) {
   const query = m.options.getFocused();
   if (!query || query.length < 2) return await m.respond([]);
   try {
-    const res = await fetch(`${SEARCH_API}?query=${encodeURIComponent(`site:substack.com ${query}`)}`, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:137.0) Gecko/20100101 Firefox/137.0' },
-    });
-    const data = await res.json();
+    const data = await Browser.json(`${SEARCH_API}?query=${encodeURIComponent(`site:substack.com ${query}`)}`);
     const choices = (data.data?.results || []).slice(0, 10).map((r) => ({
       name: r.title.slice(0, 100),
       value: r.title,

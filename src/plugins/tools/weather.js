@@ -12,7 +12,7 @@
  */
 
 import { ApplicationIntegrationType, InteractionContextType, SlashCommandBuilder } from 'discord.js';
-import { getWeather, pen, Role, translate } from '#mushi';
+import { Browser, getWeather, pen, Role, translate } from '#mushi';
 
 const GEO_API = 'https://geocoding-api.open-meteo.com/v1/search';
 
@@ -47,8 +47,7 @@ async function autoCity(m) {
   const query = m.options.getFocused();
   if (!query || query.length < 2) return await m.respond([]);
   try {
-    const res = await fetch(`${GEO_API}?name=${encodeURIComponent(query)}&count=5&language=en&format=json`);
-    const data = await res.json();
+    const data = await Browser.json(`${GEO_API}?name=${encodeURIComponent(query)}&count=5&language=en&format=json`);
     const choices = (data.results || []).map((r) => ({
       name: `${r.name}${r.country ? `, ${r.country}` : ''}${r.admin1 ? ` (${r.admin1})` : ''}`,
       value: r.name,
