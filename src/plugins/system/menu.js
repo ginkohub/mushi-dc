@@ -14,13 +14,11 @@ import { Role, translate } from '#mushi';
 const t = translate({
   en: {
     header: '--- MUSHI MENU ---',
-    footer: 'Use {prefix}command for details',
     category: 'Category',
     total: 'Total Commands',
   },
   id: {
     header: '--- MENU MUSHI ---',
-    footer: 'Gunakan {prefix}command untuk detail',
     category: 'Kategori',
     total: 'Total Perintah',
   },
@@ -29,24 +27,22 @@ const t = translate({
 async function showMenu(c) {
   const handler = c.handler();
   const categories = {};
-  const prefix = c.prefix;
 
   for (const [_id, plugin] of handler.plugins) {
-    if (!plugin.cmd || plugin.hidden) continue;
+    if (!plugin.data || plugin.hidden) continue;
     const cat = plugin.cat || 'uncategorized';
     if (!categories[cat]) categories[cat] = [];
-    categories[cat].push(plugin.cmd[0]);
+    categories[cat].push(`/${plugin.data.name}`);
   }
 
   const menu = [t('header', {}, c), ''];
   for (const [cat, cmds] of Object.entries(categories)) {
     menu.push(`[ ${cat.toUpperCase()} ]`);
-    menu.push(`> ${cmds.map((cmd) => `\`${cmd}\``).join(', ')}`);
+    menu.push(`> ${cmds.join(', ')}`);
     menu.push('');
   }
 
   menu.push(`${t('total', {}, c)}: ${handler.plugins.size}`);
-  menu.push(t('footer', { prefix }, c));
   await c.reply(menu.join('\n').trim());
 }
 

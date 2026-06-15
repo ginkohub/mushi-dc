@@ -13,13 +13,13 @@ import { Role, translate } from '#mushi';
 
 const t = translate({
   en: {
-    usage: 'Usage: {prefix}lang [en|id]',
+    usage: 'Usage: `/lang [en|id]`',
     current: 'Current language: *{lang}*',
     success: 'Language set to: *{lang}*',
     invalid: 'Invalid language. Available: en, id',
   },
   id: {
-    usage: 'Penggunaan: {prefix}lang [en|id]',
+    usage: 'Penggunaan: `/lang [en|id]`',
     current: 'Bahasa saat ini: *{lang}*',
     success: 'Bahasa diatur ke: *{lang}*',
     invalid: 'Bahasa tidak valid. Tersedia: en, id',
@@ -31,7 +31,7 @@ async function setLang(c) {
   const available = ['en', 'id'];
 
   if (!lang) {
-    return await c.reply(`${t('current', { lang: c.lang }, c)}\n${t('usage', { prefix: c.prefix }, c)}`);
+    return await c.reply(`${t('current', { lang: c.lang }, c)}\n${t('usage', {}, c)}`);
   }
 
   if (!available.includes(lang)) {

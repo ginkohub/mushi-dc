@@ -13,12 +13,12 @@ import { Role, translate } from '#mushi';
 
 const t = translate({
   en: {
-    help: 'Use `{prefix}pinterest <query>` to get 5 Pinterest images.',
+    help: 'Use `/pinterest <query>` to get Pinterest images.',
     not_found: 'No results found for "{query}".',
     header: 'Pinterest results for "{query}"',
   },
   id: {
-    help: 'Gunakan `{prefix}pinterest <query>` untuk 5 gambar Pinterest.',
+    help: 'Gunakan `/pinterest <query>` untuk gambar Pinterest.',
     not_found: 'Tidak ada hasil untuk "{query}".',
     header: 'Hasil Pinterest untuk "{query}"',
   },

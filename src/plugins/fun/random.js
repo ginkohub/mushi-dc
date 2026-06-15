@@ -50,19 +50,19 @@ const SUBCOMMANDS = {
 const t = translate({
   en: {
     help_title: 'RANDOM COMMANDS',
-    help_usage: 'Use `{prefix}random <subcommand>`',
+    help_usage: 'Use `/random <type>`',
     help_list:
       'Available:\n• `animequote` / `aq` — Anime quote\n• `bluearchive` / `ba` — Blue Archive image\n• `lahelu` — Lahelu post\n• `cecan<japan|indonesia|vietnam|china|thailand|korea>` — Cecan by country',
-    not_found: 'Unknown subcommand "{cmd}". Use `{prefix}random ?` for help.',
+    not_found: 'Unknown subcommand "{cmd}". Use `/random ?` for help.',
     api_error: 'API request failed.',
     quote: '_{quote}_\n— **{character}** ({anime})',
   },
   id: {
     help_title: 'RANDOM COMMANDS',
-    help_usage: 'Gunakan `{prefix}random <subcommand>`',
+    help_usage: 'Gunakan `/random <type>`',
     help_list:
       'Tersedia:\n• `animequote` / `aq` — Kutipan anime\n• `bluearchive` / `ba` — Gambar Blue Archive\n• `lahelu` — Postingan Lahelu\n• `cecan<japan|indonesia|vietnam|china|thailand|korea>` — Cecan by country',
-    not_found: 'Subcommand "{cmd}" tidak dikenal. Gunakan `{prefix}random ?` untuk bantuan.',
+    not_found: 'Subcommand "{cmd}" tidak dikenal. Gunakan `/random ?` untuk bantuan.',
     api_error: 'Gagal mengambil data.',
     quote: '_{quote}_\n— **{character}** ({anime})',
   },

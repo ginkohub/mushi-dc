@@ -25,7 +25,6 @@ import { UserManager } from './user_manager.js';
  * @typedef {Object} HandlerOptions
  * @property {string} pluginDir
  * @property {Function} filter
- * @property {string[]} prefix
  * @property {import('./pen.js').Pen} pen
  * @property {Map<string, import('baileys').GroupMetadata>} groupCache
  * @property {Map<string, import('baileys').Contact>} contactCache
@@ -38,7 +37,7 @@ export class Handler {
   /**
    * @param {HandlerOptions}
    */
-  constructor({ pluginDir, useSlash, filter, prefix, pen }) {
+  constructor({ pluginDir, useSlash, filter, pen }) {
     /** @type {number} */
     this.startAt = Date.now();
 
@@ -56,14 +55,8 @@ export class Handler {
     /** @type {import('./pen.js').Pen)} */
     this.pen = pen ?? new Pen({ prefix: 'hand' });
 
-    /** @type {string[]} */
-    this.prefix = prefix ?? ['.', '/'];
-
     /** @type {Map<number, import('./plugin.js').Plugin>} */
     this.plugins = new Map();
-
-    /** @type {Map<string, {id: number, prefix: string, cmd: string}>} */
-    this.cmds = new Map();
 
     /** @type {Map<number, number>} */
     this.listens = new Map();
@@ -205,22 +198,6 @@ export class Handler {
   }
 
   /**
-   * Set prefix for command plugins
-   * @param {string[]} prefix
-   */
-  setPrefix(prefix) {
-    if (!Array.isArray(prefix) || prefix?.length === 0) {
-      return this.pen.Warn('Prefix must be an array larger than 0');
-    }
-    this.prefix = prefix;
-    this.cmds.clear();
-    for (const [id, plugin] of this.plugins) {
-      if (!plugin.cmd) continue;
-      this.genCMD(id, plugin);
-    }
-  }
-
-  /**
    * Get saved aliases
    * @returns {Object.<string, string>}
    */
@@ -236,46 +213,6 @@ export class Handler {
     const data = read();
     data.aliases = aliases;
     write(data);
-  }
-
-  /**
-   * Generate & registering command for given plugin
-   * @param {string} id
-   * @param {import('./plugin.js').Plugin} plugin
-   */
-  genCMD(id, plugin) {
-    if (plugin?.cmd) {
-      /** @type {string[]} */
-      let precmds = [];
-      if (Array.isArray(plugin.cmd)) {
-        precmds = plugin.cmd;
-      } else if (typeof plugin.cmd === 'string') {
-        precmds = [plugin.cmd];
-      }
-
-      for (const precmd of precmds) {
-        if (!precmd) continue;
-        if (plugin.noPrefix) {
-          this.cmds?.set(precmd.toLowerCase(), {
-            id: id,
-            cmd: precmd.toLowerCase(),
-          });
-        } else if (this.prefix) {
-          for (const pre of this.prefix) {
-            this.cmds?.set(`${pre}${precmd.toLowerCase()}`, {
-              id: id,
-              prefix: pre,
-              cmd: precmd.toLowerCase(),
-            });
-          }
-        } else {
-          this.cmds?.set(precmd.toLowerCase(), {
-            id: id,
-            cmd: precmd.toLowerCase(),
-          });
-        }
-      }
-    }
   }
 
   /**
@@ -300,10 +237,8 @@ export class Handler {
       const newid = `${hash}-${i}`;
       this.plugins.set(newid, plugin);
 
-      /* Check if plugin has cmd, so it is a command plugin */
-      if (plugin.cmd) {
-        this.genCMD(newid, plugin);
-      } else if (plugin.data) {
+      /* Check if plugin has data, so it is a slash command */
+      if (plugin.data) {
         this.slashs.set(plugin.data.name, newid);
         if (opt.autocomplete) this.autoc.set(plugin.data.name, opt.autocomplete);
       } else {
@@ -325,9 +260,6 @@ export class Handler {
           this.plugins.delete(id);
           for (const [id_ls, val] of this.listens) {
             if (val === id) this.listens.delete(id_ls);
-          }
-          for (const [id_cmd, val] of this.cmds) {
-            if (val?.id?.startsWith(hash)) this.cmds.delete(id_cmd);
           }
           for (const [id_sls, val] of this.slashs) {
             if (val === id_sls) this.slashs.delete(id_sls);
@@ -436,35 +368,6 @@ export class Handler {
   }
 
   /**
-   * Get command by pattern
-   * @param {string} p
-   * @returns {{id: number, prefix: string, cmd: string, plugin:import('./plugin.js').Plugin}|undefined}
-   */
-  getCMD(p) {
-    if (!p) return;
-    const data = this.cmds.get(p.toLowerCase());
-    if (!data) return;
-    const plugin = this.plugins.get(data.id);
-    if (!plugin) return;
-    return {
-      id: data.id,
-      prefix: data.prefix,
-      cmd: data.cmd,
-      plugin: plugin,
-    };
-  }
-
-  /**
-   * Check if given pattern is a command
-   * @param {string} p
-   * @returns {boolean}
-   */
-  isCMD(p) {
-    if (!p) return false;
-    return this.cmds.has(p.toLowerCase());
-  }
-
-  /**
    * Check if given context id is already exist in watchID
    * @param {import('./context.js').Ctx} ctx
    * @returns {boolean|undefined}
@@ -513,8 +416,7 @@ export class Handler {
       await this.updateData(ctx);
 
       if (this.paused) {
-        const isPause = ctx.isSlash ? ctx.cmd === 'pause' : ctx.pattern && this.getCMD(ctx.pattern)?.cmd === 'pause';
-        if (!isPause) return;
+        if (ctx.isSlash && ctx.cmd === 'pause') return;
       }
 
       for (const lsid of this.listens.values()) {
@@ -552,44 +454,6 @@ export class Handler {
         }
       }
 
-      /* Handle commands */
-      if (ctx?.pattern && this.isSafe(ctx)) {
-        const data = this.getCMD(ctx.pattern.toLowerCase());
-        if (!data) return;
-
-        /** @type {import('./plugin.js').Plugin} */
-        try {
-          ctx.plugin = () => data.plugin;
-          ctx.prefix = data.prefix;
-          ctx.cmd = data.cmd;
-
-          /* Check rules and midware before exec */
-          const reason = await data?.plugin?.check(ctx);
-          if (!reason?.success) {
-            if (data?.plugin?.final) await data?.plugin.final(ctx, reason);
-            return;
-          }
-
-          /* Exec */
-          if (data?.plugin?.exec) await data?.plugin?.exec(ctx);
-        } catch (e) {
-          this.pen.Error('handle-command', ctx.pattern, e);
-          if (data?.plugin?.final) {
-            await data?.plugin?.final(
-              ctx,
-              new Reason({
-                success: false,
-                code: 'handle-command-error',
-                author: import.meta.url,
-                message: e.message,
-              }),
-            );
-          }
-        } finally {
-          ctx.plugin = null;
-        }
-      }
-
       /* Handle slash command */
       if (ctx.isSlash && ctx.cmd && this.isSafe(ctx)) {
         const pid = this.slashs.get(ctx.cmd);
@@ -599,8 +463,6 @@ export class Handler {
             try {
               /** @type {import('./plugin.js').Plugin} */
               ctx.plugin = () => plugin;
-              ctx.prefix = '/';
-              ctx.cmd = plugin.cmd;
 
               /* Check rules and midware before exec */
               const reason = await plugin?.check(ctx);
@@ -679,9 +541,8 @@ export class Handler {
   async eventReady(e) {
     this.pen.Info('Client ready :', e.user.tag);
     this.pen.Info(
-      `${this.slashs.size} Slashs (${this.useSlash ? 'enabled' : 'disabled'}), ${this.cmds.size} Cmds, ${this.listens.size} Listeners of ${this.plugins.size} Plugins`,
+      `${this.slashs.size} Slashs (${this.useSlash ? 'enabled' : 'disabled'}), ${this.listens.size} Listeners of ${this.plugins.size} Plugins`,
     );
-    this.pen.Info(`${[...this.cmds.keys()]}`);
     await delay(1000);
 
     if (this.useSlash) {
@@ -700,47 +561,6 @@ export class Handler {
         });
       } else {
         await rest.put(Routes.applicationCommands(process.env.DISCORD_CLIENT_ID), { body: commands });
-      }
-    }
-  }
-
-  /**
-   * Handle slash command
-   *
-   * @param {import('discord.js').ChatInputCommandInteraction} m
-   */
-  async eventSlash(m) {
-    if (!m.isCommand()) return;
-
-    const pid = this.slashs.get(m.commandName);
-    if (!pid) return;
-
-    const cmd = this.plugins.get(pid);
-    if (!cmd) return;
-
-    const ctx = new Ctx(m);
-    const check = await cmd.check(ctx);
-    if (!check.success) {
-      try {
-        await m.reply({ content: check.message, flags: MessageFlags.Ephemeral });
-      } catch {
-        /* ignore */
-      }
-      return;
-    }
-
-    try {
-      this.pen.Debug(`⚡${m.commandName} : ${m.options?.data?.length}`);
-      await cmd.exec(m);
-    } catch (error) {
-      this.pen.Error(error);
-      try {
-        await m.reply({
-          content: 'There was an error while executing this command!',
-          flags: MessageFlags.Ephemeral,
-        });
-      } catch (ee) {
-        this.pen.Error(ee);
       }
     }
   }

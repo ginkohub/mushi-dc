@@ -15,13 +15,13 @@ const API = 'https://api.siputzx.my.id/api/s';
 
 const t = translate({
   en: {
-    help: 'Use `{prefix}search <query>` to search web.\n`{prefix}search yt <query>` for YouTube.\n`{prefix}search gsm <query>` for GSMArena.',
+    help: 'Use `/search web <query>` to search web.\n`/search yt <query>` for YouTube.\n`/search gsm <query>` for GSMArena.',
     not_found: 'No results.',
     yt_result: '[{title}]({url})',
     gsm_result: '**{name}**\n{description}',
   },
   id: {
-    help: 'Gunakan `{prefix}search <query>` untuk cari web.\n`{prefix}search yt <query>` untuk YouTube.\n`{prefix}search gsm <query>` untuk GSMArena.',
+    help: 'Gunakan `/search web <query>` untuk cari web.\n`/search yt <query>` untuk YouTube.\n`/search gsm <query>` untuk GSMArena.',
     not_found: 'Tidak ada hasil.',
     yt_result: '[{title}]({url})',
     gsm_result: '**{name}**\n{description}',

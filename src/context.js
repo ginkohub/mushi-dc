@@ -31,9 +31,6 @@ export class Ctx {
     /** @type {import('./plugin.js').Plugin} */
     this.plugin = null;
 
-    /** @type {string} */
-    this.prefix = '';
-
     /** @returns {import('discord.js').Client} */
     this.client = () => handler?.client;
 
@@ -86,20 +83,9 @@ export class Ctx {
     this.parseText = (text) => {
       this.text = text;
 
-      /* Parsing cmd */
       if (text && text.length > 0) {
         const splitted = text.split(' ');
-        /** @type {string} - With prefix */
-        this.pattern = splitted[0];
-
-        /** @type {string} - No prefixed */
-        this.cmd = this.pattern?.slice(this.prefix?.length ?? 0);
-
-        /** @type {string} */
         this.args = splitted.slice(1)?.join(' ');
-
-        /** @type {boolean} */
-        this.isCMD = handler?.isCMD(this.pattern);
       }
     };
 
@@ -158,7 +144,6 @@ export class Ctx {
             this.argv[o.name] = o.value;
           });
           this.cmd = event.commandName;
-          this.isCMD = true;
 
           /** @type {boolean} */
           this.isSlash = true;

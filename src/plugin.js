@@ -37,7 +37,6 @@ export const RoleMoji = Object.freeze({
  * @property {import('./handler.js').Handler} handler
  * @property {import('discord.js').Client} client
  * @property {string | string[]} cmd
- * @property {string} prefix
  * @property {string} desc
  * @property {string[]} tags
  * @property {string} cat
@@ -45,7 +44,6 @@ export const RoleMoji = Object.freeze({
  * @property {boolean} hidden
  * @property {Array<Role> | any} roles
  * @property {number} timeout
- * @property {boolean} noPrefix
  * @property {(ctx: import('./context.js').Ctx) => Promise<Reason> | Reason} midware
  * @property {(ctx: import('./context.js').Ctx) => Promise<void>} exec
  * @property {(ctx: import('./context.js').Ctx, reason: Reason) => Promise<void>} final
@@ -57,23 +55,7 @@ export const RoleMoji = Object.freeze({
  */
 export class Plugin {
   /** @param {Plugin} */
-  constructor({
-    data,
-    cmd,
-    prefix,
-    desc,
-    cat,
-    tags,
-    disabled,
-    hidden,
-    roles,
-    timeout,
-    noPrefix,
-    midware,
-    exec,
-    final,
-    location,
-  }) {
+  constructor({ data, cmd, desc, cat, tags, disabled, hidden, roles, timeout, midware, exec, final, location }) {
     /** @type {import('./handler.js').Handler} */
     this.handler = null;
 
@@ -85,12 +67,6 @@ export class Plugin {
 
     /** @type {string | string[]}*/
     this.cmd = cmd;
-
-    /** @type {string} */
-    this.prefix = prefix;
-
-    /** @type {boolean} */
-    this.noPrefix = noPrefix;
 
     /** @type {string} */
     this.desc = desc;

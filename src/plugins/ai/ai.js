@@ -25,25 +25,25 @@ const modelListStr = () => MODEL_NAMES.join(', ');
 
 const t = translate({
   en: {
-    usage: 'Usage: `{prefix}ai <message>` or reply to a message',
+    usage: 'Usage: `/ai chat <message>` or reply to a message',
     model_set: '_Model set to {model}_',
     prompt_set: '_System prompt updated_',
     temp_set: '_Temperature set to {temp}_',
     temp_range: 'Temperature must be between 0 and 2',
     cleared: '_Conversation cleared_',
     models: '*Available models:* {models}',
-    choose_model: 'Usage: `{prefix}ai model <name>`\nAvailable: {models}',
+    choose_model: 'Usage: `/ai model <name>`\nAvailable: {models}',
     no_msg: 'Please provide a message or reply to one',
   },
   id: {
-    usage: 'Gunakan: `{prefix}ai <pesan>` atau balas pesan',
+    usage: 'Gunakan: `/ai chat <pesan>` atau balas pesan',
     model_set: '_Model diubah ke {model}_',
     prompt_set: '_System prompt diperbarui_',
     temp_set: '_Temperature diubah ke {temp}_',
     temp_range: 'Temperature harus antara 0 dan 2',
     cleared: '_Percakapan dihapus_',
     models: '*Model tersedia:* {models}',
-    choose_model: 'Gunakan: `{prefix}ai model <nama>`\nTersedia: {models}',
+    choose_model: 'Gunakan: `/ai model <nama>`\nTersedia: {models}',
     no_msg: 'Berikan pesan atau balas pesan',
   },
 });

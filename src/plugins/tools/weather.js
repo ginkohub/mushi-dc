@@ -16,7 +16,7 @@ const GEO_API = 'https://geocoding-api.open-meteo.com/v1/search';
 const t = translate({
   en: {
     help_title: 'WEATHER INFO',
-    help_usage: 'Use `{prefix}weather [city]` to check current weather.',
+    help_usage: 'Use `/weather [city]` to check current weather.',
     not_found: 'City "{query}" not found!',
     api_error: 'Failed to fetch weather data.',
     header: 'Weather in {location}',
@@ -28,7 +28,7 @@ const t = translate({
   },
   id: {
     help_title: 'INFO CUACA',
-    help_usage: 'Gunakan `{prefix}weather [kota]` untuk cek cuaca.',
+    help_usage: 'Gunakan `/weather [kota]` untuk cek cuaca.',
     not_found: 'Kota "{query}" tidak ditemukan!',
     api_error: 'Gagal memuat data cuaca.',
     header: 'Cuaca di {location}',

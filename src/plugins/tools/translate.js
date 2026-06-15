@@ -14,11 +14,11 @@ import { Role, read, translate, translateText, write } from '#mushi';
 const t = translate({
   en: {
     usage:
-      "Usage: {prefix}tr [lang] [-e google|libre] <text>\n       {prefix}tr? — show this help\n       {prefix}tra <lang> <user> — auto-translate user's messages",
+      "Usage: `/translate text [lang] <text>` — translate text\n       `/translate auto <lang> <user>` — auto-translate user's messages",
   },
   id: {
     usage:
-      'Penggunaan: {prefix}tr [lang] [-e google|libre] <teks>\n       {prefix}tr? — bantuan ini\n       {prefix}tra <lang> <user> — auto-translate pesan user',
+      'Penggunaan: `/translate text [lang] <teks>` — terjemahkan teks\n       `/translate auto <lang> <user>` — auto-translate pesan user',
   },
 });
 
