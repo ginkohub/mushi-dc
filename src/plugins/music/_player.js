@@ -26,10 +26,14 @@ import {
   VoiceConnectionStatus,
 } from '@discordjs/voice';
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
-import ffmpegPath from 'ffmpeg-static';
 import YtDlpWrap from 'yt-dlp-wrap';
 import { read, write } from '#mushi';
 import pen from '#mushi/pen.js';
+
+let ffmpegPath = 'ffmpeg';
+try {
+  ffmpegPath = (await import('ffmpeg-static')).default;
+} catch {}
 
 const BIN_DIR = resolve('./bin');
 
