@@ -11,8 +11,8 @@
  *   siputzx.my.id - unofficial API aggregator
  */
 
-import { ApplicationIntegrationType, InteractionContextType, SlashCommandBuilder } from 'discord.js';
-import { Browser, Role, read, translate, write } from '#mushi';
+import { ApplicationIntegrationType, InteractionContextType, MessageFlags, SlashCommandBuilder } from 'discord.js';
+import { Browser, pen, Role, read, translate, write } from '#mushi';
 
 const BASE = 'https://api.siputzx.my.id/api/ai';
 
@@ -82,7 +82,7 @@ async function processQuery(query, channelId) {
   const context = [...history, { role: 'user', content: query }].map((h) => `${h.role}: ${h.content}`).join('\n\n');
 
   const result = await callApi(model, context, system, temperature);
-  if (!result.status) return null;
+  if (!result.status) return result;
 
   history.push({ role: 'user', content: query });
   history.push({ role: 'assistant', content: result.text });
@@ -90,7 +90,7 @@ async function processQuery(query, channelId) {
   const maxHistory = 20;
   if (history.length > maxHistory) history.splice(0, history.length - maxHistory);
 
-  return result.text;
+  return result;
 }
 
 function splitText(text, maxLen = 2000) {
@@ -151,18 +151,22 @@ const chatExec = async (c) => {
   const channelId = c.event.channel?.id || c.event.user?.id;
   await c.event.deferReply();
   try {
-    const text = await processQuery(query, channelId);
-    if (!text) {
+    const res = await processQuery(query, channelId);
+    if (!res.status) {
+      pen.Error('AI', res.error);
       await c.event.editReply('❌');
+      await c.event.followUp({ content: `Error: ${res.error}`, flags: MessageFlags.Ephemeral });
       return;
     }
-    const chunks = splitText(text);
+    const chunks = splitText(res.text);
     for (let i = 0; i < chunks.length; i++) {
       if (i === 0) await c.event.editReply(chunks[i]);
       else await c.event.followUp(chunks[i]);
     }
-  } catch {
+  } catch (e) {
+    pen.Error('AI', e);
     await c.event.editReply('❌');
+    await c.event.followUp({ content: `Unexpected error: ${e.message}`, flags: MessageFlags.Ephemeral });
   }
 };
 
@@ -212,11 +216,16 @@ export default [
       const channelId = msg.channel?.id || msg.author?.id;
       const query = msg.content || '';
       try {
-        const text = await processQuery(query, channelId);
-        if (!text) return;
-        const sent = await msg.reply(text);
+        const res = await processQuery(query, channelId);
+        if (!res.status) {
+          pen.Error('AI', res.error);
+          return;
+        }
+        const sent = await msg.reply(res.text);
         if (sent?.id) aiMessages.add(sent.id);
-      } catch {}
+      } catch (e) {
+        pen.Error('AI', e);
+      }
     },
   },
   {
