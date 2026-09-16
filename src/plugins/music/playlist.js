@@ -10,9 +10,10 @@
  * Credits: siputzx.my.id - unofficial YouTube search API
  */
 
+import { AudioPlayerStatus } from '@discordjs/voice';
 import { ApplicationIntegrationType, InteractionContextType, SlashCommandBuilder } from 'discord.js';
 import { Browser, Role, read, write } from '#mushi';
-import { connect, formatDuration, getState, getYT, playSong, resolveSong } from './_player.js';
+import { connect, formatDuration, getState, getYT, playSong, resolveSong, sendPlayerUI } from './_player.js';
 
 function getPlaylists() {
   return read().playlists || {};
@@ -78,7 +79,28 @@ async function exec(c) {
         if (!song) return await c.event.editReply('No results found.');
         playlists[uid][name].push(song);
         savePlaylists(playlists);
-        await c.event.editReply(`Added **${song.title}** to **${name}**.`);
+
+        const state = getState(guild.id);
+        let queued = false;
+        if (state.currentPlaylist && state.currentPlaylist.name === name && state.currentPlaylist.userId === uid) {
+          state.songs.push({ ...song, requester: uid });
+          queued = true;
+
+          const isPlaying = state.current !== null && state.player.state.status !== AudioPlayerStatus.Idle;
+          if (!isPlaying) {
+            const voiceChannel = c.event.member?.voice?.channel;
+            if (voiceChannel) {
+              if (!state.textChannel) state.textChannel = c.event.channel;
+              await connect(guild, voiceChannel);
+              playSong(guild);
+            }
+          } else {
+            await sendPlayerUI(state);
+          }
+        }
+
+        const queuedMsg = queued ? ' (and queued for playback)' : '';
+        await c.event.editReply(`Added **${song.title}** to **${name}**${queuedMsg}.`);
         break;
       }
       case 'remove': {
@@ -88,6 +110,16 @@ async function exec(c) {
           return await c.event.editReply(`Index must be between 1 and ${playlists[uid][name].length}.`);
         const removed = playlists[uid][name].splice(index - 1, 1)[0];
         savePlaylists(playlists);
+
+        const state = getState(guild.id);
+        if (state.currentPlaylist && state.currentPlaylist.name === name && state.currentPlaylist.userId === uid) {
+          const qIndex = state.songs.findIndex((s) => s.url === removed.url);
+          if (qIndex !== -1) {
+            state.songs.splice(qIndex, 1);
+            await sendPlayerUI(state);
+          }
+        }
+
         await c.event.editReply(`Removed **${removed.title}** from **${name}**.`);
         break;
       }
@@ -100,17 +132,20 @@ async function exec(c) {
         if (!voiceChannel) return await c.event.editReply('You must be in a voice channel.');
 
         const state = getState(guild.id);
-        const isPlaying = state.current !== null || state.songs.length > 0;
-
         if (!state.textChannel) state.textChannel = c.event.channel;
+
+        state.currentPlaylist = { name, userId: uid };
 
         for (const s of pl) {
           state.songs.push({ ...s, requester: uid });
         }
 
+        const isPlaying = state.current !== null && state.player.state.status !== AudioPlayerStatus.Idle;
         if (!isPlaying) {
           await connect(guild, voiceChannel);
           playSong(guild);
+        } else {
+          await sendPlayerUI(state);
         }
 
         await c.event.editReply(`Queued **${pl.length}** songs from **${name}**.`);

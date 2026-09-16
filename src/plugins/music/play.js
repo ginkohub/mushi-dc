@@ -10,9 +10,10 @@
  * Credits: siputzx.my.id - unofficial YouTube search API
  */
 
+import { AudioPlayerStatus } from '@discordjs/voice';
 import { ApplicationIntegrationType, InteractionContextType, MessageFlags, SlashCommandBuilder } from 'discord.js';
 import { Browser, pen, Role } from '#mushi';
-import { connect, formatDuration, getState, getYT, playSong, resolveSong } from './_player.js';
+import { connect, formatDuration, getState, getYT, playSong, resolveSong, sendPlayerUI } from './_player.js';
 
 async function exec(c) {
   const query = c.event.options.getString('query') || '';
@@ -32,12 +33,13 @@ async function exec(c) {
   try {
     const yt = await getYT();
     const state = getState(guild.id);
-    const isPlaying = state.current !== null || state.songs.length > 0;
 
     if (!state.textChannel) state.textChannel = c.event.channel;
 
     const isUrl = /^https?:\/\//.test(query);
-    const isPlaylist = /youtube\.com\/playlist\?list=/.test(query);
+    const isPlaylist =
+      /youtube\.com\/playlist\?list=/.test(query) ||
+      /(?:youtube\.com|youtu\.be)\/.*[?&]list=([a-zA-Z0-9_-]+)/.test(query);
 
     if (isUrl && isPlaylist) {
       const entries = await yt.getPlaylistInfo(query);
@@ -52,9 +54,12 @@ async function exec(c) {
           requester: c.senderId,
         });
       }
+      const isPlaying = state.current !== null && state.player.state.status !== AudioPlayerStatus.Idle;
       if (!isPlaying) {
         await connect(guild, voiceChannel);
         playSong(guild);
+      } else {
+        await sendPlayerUI(state);
       }
       const msg = `Added **${items.length}** songs from playlist${items.length < entries.length ? ` (showing first ${limit})` : ''}.`;
       await c.event.editReply(msg);
@@ -66,11 +71,14 @@ async function exec(c) {
       }
       song.requester = c.senderId;
 
+      const isPlaying = state.current !== null && state.player.state.status !== AudioPlayerStatus.Idle;
       state.songs.push(song);
 
       if (!isPlaying) {
         await connect(guild, voiceChannel);
         playSong(guild);
+      } else {
+        await sendPlayerUI(state);
       }
 
       const msg = isPlaying

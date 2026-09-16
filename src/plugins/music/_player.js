@@ -233,6 +233,7 @@ class GuildState {
     this.ffmpeg = null;
     this.ytproc = null;
     this.playerMsg = null;
+    this.currentPlaylist = null;
   }
 }
 
@@ -276,6 +277,7 @@ function getState(guildId) {
         if (g) playSong(g);
       } else {
         state.current = null;
+        state.currentPlaylist = null;
         removePlayerUI(state);
         if (state.connection) {
           state.nextDc = setTimeout(() => {
@@ -286,6 +288,20 @@ function getState(guildId) {
             }
           }, 60_000);
         }
+      }
+    });
+
+    state.player.on('error', (err) => {
+      pen.Error('AudioPlayer error', err);
+      stopProgressTimer(state);
+      killProcs(state);
+      if (state.songs.length > 0) {
+        const g = guilds.get(guildId);
+        if (g) playSong(g);
+      } else {
+        state.current = null;
+        state.currentPlaylist = null;
+        removePlayerUI(state);
       }
     });
   }
@@ -345,6 +361,7 @@ function disconnect(guildId) {
   stopProgressTimer(state);
   state.songs = [];
   state.current = null;
+  state.currentPlaylist = null;
   state.history = [];
   state.loopMode = 0;
   state.startedAt = null;
@@ -368,6 +385,7 @@ function cleanup(guildId) {
   stopProgressTimer(state);
   state.songs = [];
   state.current = null;
+  state.currentPlaylist = null;
   state.history = [];
   state.loopMode = 0;
   state.startedAt = null;
@@ -556,6 +574,7 @@ function removeFromQueue(guildId, index) {
 function clearQueue(guildId) {
   const state = getState(guildId);
   state.songs = [];
+  state.currentPlaylist = null;
 }
 
 function moveInQueue(guildId, from, to) {
