@@ -25,10 +25,10 @@ async function execShuffle(c) {
   const guild = c.event.guild;
   if (!guild) return await c.react('❌');
   const state = getState(guild.id);
-  if (state.songs.length < 2) return await c.reply('Not enough songs in queue to shuffle.');
+  if (state.tracks.length < 2) return await c.reply('Not enough songs in playlist to shuffle.');
   shuffleQueue(guild.id);
   await sendPlayerUI(state);
-  await c.reply('🔀 Queue shuffled.');
+  await c.reply('🔀 Playlist shuffled.');
 }
 
 async function execLoop(c) {
@@ -56,22 +56,22 @@ async function execRemove(c) {
   const removed = removeFromQueue(guild.id, index);
   if (!removed) {
     const state = getState(guild.id);
-    return await c.reply(`Invalid index. Queue has ${state.songs.length} song(s).`);
+    return await c.reply(`Invalid index. Playlist has ${state.tracks.length} song(s).`);
   }
 
   const state = getState(guild.id);
   await sendPlayerUI(state);
-  await c.reply(`Removed **${removed.title}** from queue.`);
+  await c.reply(`Removed **${removed.title}** from playlist.`);
 }
 
 async function execClear(c) {
   const guild = c.event.guild;
   if (!guild) return await c.react('❌');
   const state = getState(guild.id);
-  if (state.songs.length === 0) return await c.reply('Queue is already empty.');
+  if (state.tracks.length === 0) return await c.reply('Playlist is already empty.');
   clearQueue(guild.id);
   await sendPlayerUI(state);
-  await c.reply('🗑️ Queue cleared.');
+  await c.reply('🗑️ Playlist cleared.');
 }
 
 async function execMove(c) {
@@ -88,7 +88,7 @@ async function execMove(c) {
   const ok = moveInQueue(guild.id, from, to);
   if (!ok) {
     const state = getState(guild.id);
-    return await c.reply(`Invalid indices. Queue has ${state.songs.length} song(s).`);
+    return await c.reply(`Invalid indices. Playlist has ${state.tracks.length} song(s).`);
   }
 
   const state = getState(guild.id);
@@ -105,10 +105,10 @@ async function execSave(c) {
   if (!name) return await c.reply('Please provide a playlist name.');
 
   const state = getState(guild.id);
-  if (state.songs.length === 0) return await c.reply('Queue is empty.');
+  if (state.tracks.length === 0) return await c.reply('Playlist is empty.');
 
   saveQueue(guild.id, name, c.senderId);
-  await c.reply(`💾 Saved **${state.songs.length}** songs as playlist **${name}**.`);
+  await c.reply(`💾 Saved **${state.tracks.length}** songs as server playlist **${name}**.`);
 }
 
 const shuffleSlash = {

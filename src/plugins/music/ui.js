@@ -69,7 +69,7 @@ async function exec(c) {
       break;
     }
     case 'mp_shuffle': {
-      if (state.songs.length < 2) break;
+      if (state.tracks.length < 2) break;
       shuffleQueue(guild.id);
       await sendPlayerUI(state);
       break;

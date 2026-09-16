@@ -12,18 +12,20 @@
 
 import { AudioPlayerStatus } from '@discordjs/voice';
 import { ApplicationIntegrationType, InteractionContextType, SlashCommandBuilder } from 'discord.js';
-import { Browser, Role, read, write } from '#mushi';
-import { connect, formatDuration, getState, getYT, playSong, resolveSong, sendPlayerUI } from './_player.js';
-
-function getPlaylists() {
-  return read().playlists || {};
-}
-
-function savePlaylists(playlists) {
-  const data = read();
-  data.playlists = playlists;
-  write(data);
-}
+import { Browser, Role } from '#mushi';
+import {
+  clearQueue,
+  connect,
+  formatDuration,
+  getGuildPlaylists,
+  getState,
+  getYT,
+  playSong,
+  removeFromQueue,
+  resolveSong,
+  saveGuildPlaylists,
+  sendPlayerUI,
+} from './_player.js';
 
 async function exec(c) {
   const guild = c.event.guild;
@@ -32,8 +34,7 @@ async function exec(c) {
   await c.event.deferReply();
 
   const uid = c.senderId;
-  const playlists = getPlaylists();
-  if (!playlists[uid]) playlists[uid] = {};
+  const playlists = getGuildPlaylists(guild.id);
 
   {
     const sub = c.event.options.getSubcommand();
@@ -44,52 +45,66 @@ async function exec(c) {
     switch (sub) {
       case 'create': {
         if (!name) return await c.event.editReply('Name is required.');
-        if (playlists[uid][name]) return await c.event.editReply(`Playlist **${name}** already exists.`);
-        playlists[uid][name] = [];
-        savePlaylists(playlists);
+        if (playlists[name]) return await c.event.editReply(`Playlist **${name}** already exists.`);
+        playlists[name] = [];
+        saveGuildPlaylists(guild.id, playlists);
         await c.event.editReply(`Created playlist **${name}**.`);
         break;
       }
       case 'delete': {
-        if (!name || !playlists[uid][name]) return await c.event.editReply(`Playlist **${name}** not found.`);
-        delete playlists[uid][name];
-        savePlaylists(playlists);
+        if (!name || !playlists[name]) return await c.event.editReply(`Playlist **${name}** not found.`);
+        const state = getState(guild.id);
+        if (state.activePlaylist === name) {
+          state.activePlaylist = null;
+          clearQueue(guild.id);
+        }
+        delete playlists[name];
+        saveGuildPlaylists(guild.id, playlists);
         await c.event.editReply(`Deleted playlist **${name}**.`);
         break;
       }
       case 'list': {
-        const names = Object.keys(playlists[uid]);
-        if (names.length === 0) return await c.event.editReply('You have no playlists.');
-        const lines = names.map((n) => `**${n}** (${playlists[uid][n].length} songs)`);
-        await c.event.editReply(`**Your playlists:**\n${lines.join('\n')}`);
+        const names = Object.keys(playlists);
+        if (names.length === 0) return await c.event.editReply('There are no server playlists.');
+        const state = getState(guild.id);
+        const lines = names.map(
+          (n) => `**${n}** (${playlists[n].length} songs)${state.activePlaylist === n ? ' *(active)*' : ''}`,
+        );
+        await c.event.editReply(`**Server playlists:**\n${lines.join('\n')}`);
         break;
       }
       case 'show': {
-        if (!name || !playlists[uid][name]) return await c.event.editReply(`Playlist **${name}** not found.`);
-        const pl = playlists[uid][name];
+        if (!name || !playlists[name]) return await c.event.editReply(`Playlist **${name}** not found.`);
+        const pl = playlists[name];
         if (pl.length === 0) return await c.event.editReply(`Playlist **${name}** is empty.`);
-        const lines = pl.map((s, i) => `**${i + 1}.** ${s.title} (${formatDuration(s.duration)})`);
+        const state = getState(guild.id);
+        const lines = pl.map((s, i) => {
+          const isCurrent = state.activePlaylist === name && state.currentIndex === i;
+          const marker = isCurrent ? '▶️ ' : '';
+          return `**${marker}${i + 1}.** ${s.title} (${formatDuration(s.duration)})`;
+        });
         await c.event.editReply(`**${name}** (${pl.length} songs):\n${lines.join('\n')}`);
         break;
       }
       case 'add': {
         if (!name || !query) return await c.event.editReply('Name and query are required.');
-        if (!playlists[uid][name]) return await c.event.editReply(`Playlist **${name}** not found.`);
+        if (!playlists[name]) return await c.event.editReply(`Playlist **${name}** not found.`);
         const song = await resolveSong(query);
         if (!song) return await c.event.editReply('No results found.');
-        playlists[uid][name].push(song);
-        savePlaylists(playlists);
+        song.requester = uid;
+        playlists[name].push(song);
+        saveGuildPlaylists(guild.id, playlists);
 
         const state = getState(guild.id);
-        let queued = false;
-        if (state.currentPlaylist && state.currentPlaylist.name === name && state.currentPlaylist.userId === uid) {
-          state.songs.push({ ...song, requester: uid });
-          queued = true;
-
+        if (state.activePlaylist === name) {
+          state.tracks.push(song);
           const isPlaying = state.current !== null && state.player.state.status !== AudioPlayerStatus.Idle;
           if (!isPlaying) {
             const voiceChannel = c.event.member?.voice?.channel;
             if (voiceChannel) {
+              if (state.currentIndex === -1 || state.currentIndex >= state.tracks.length) {
+                state.currentIndex = state.tracks.length - 1;
+              }
               if (!state.textChannel) state.textChannel = c.event.channel;
               await connect(guild, voiceChannel);
               playSong(guild);
@@ -99,33 +114,30 @@ async function exec(c) {
           }
         }
 
-        const queuedMsg = queued ? ' (and queued for playback)' : '';
-        await c.event.editReply(`Added **${song.title}** to **${name}**${queuedMsg}.`);
+        await c.event.editReply(`Added **${song.title}** to **${name}**.`);
         break;
       }
       case 'remove': {
         if (!name || index == null) return await c.event.editReply('Name and index are required.');
-        if (!playlists[uid][name]) return await c.event.editReply(`Playlist **${name}** not found.`);
-        if (index < 1 || index > playlists[uid][name].length)
-          return await c.event.editReply(`Index must be between 1 and ${playlists[uid][name].length}.`);
-        const removed = playlists[uid][name].splice(index - 1, 1)[0];
-        savePlaylists(playlists);
+        if (!playlists[name]) return await c.event.editReply(`Playlist **${name}** not found.`);
+        if (index < 1 || index > playlists[name].length)
+          return await c.event.editReply(`Index must be between 1 and ${playlists[name].length}.`);
 
         const state = getState(guild.id);
-        if (state.currentPlaylist && state.currentPlaylist.name === name && state.currentPlaylist.userId === uid) {
-          const qIndex = state.songs.findIndex((s) => s.url === removed.url);
-          if (qIndex !== -1) {
-            state.songs.splice(qIndex, 1);
-            await sendPlayerUI(state);
-          }
+        let removed;
+        if (state.activePlaylist === name) {
+          removed = removeFromQueue(guild.id, index);
+        } else {
+          removed = playlists[name].splice(index - 1, 1)[0];
+          saveGuildPlaylists(guild.id, playlists);
         }
 
-        await c.event.editReply(`Removed **${removed.title}** from **${name}**.`);
+        await c.event.editReply(`Removed **${removed?.title || `#${index}`}** from **${name}**.`);
         break;
       }
       case 'play': {
-        if (!name || !playlists[uid][name]) return await c.event.editReply(`Playlist **${name}** not found.`);
-        const pl = playlists[uid][name];
+        if (!name || !playlists[name]) return await c.event.editReply(`Playlist **${name}** not found.`);
+        const pl = playlists[name];
         if (pl.length === 0) return await c.event.editReply(`Playlist **${name}** is empty.`);
 
         const voiceChannel = c.event.member?.voice?.channel;
@@ -134,21 +146,14 @@ async function exec(c) {
         const state = getState(guild.id);
         if (!state.textChannel) state.textChannel = c.event.channel;
 
-        state.currentPlaylist = { name, userId: uid };
+        state.activePlaylist = name;
+        state.tracks = pl.map((s) => ({ ...s, requester: s.requester || uid }));
+        state.currentIndex = 0;
 
-        for (const s of pl) {
-          state.songs.push({ ...s, requester: uid });
-        }
+        await connect(guild, voiceChannel);
+        playSong(guild);
 
-        const isPlaying = state.current !== null && state.player.state.status !== AudioPlayerStatus.Idle;
-        if (!isPlaying) {
-          await connect(guild, voiceChannel);
-          playSong(guild);
-        } else {
-          await sendPlayerUI(state);
-        }
-
-        await c.event.editReply(`Queued **${pl.length}** songs from **${name}**.`);
+        await c.event.editReply(`Playing playlist **${name}** (${pl.length} songs).`);
         break;
       }
     }
@@ -188,8 +193,7 @@ async function autocomplete(m, signal) {
     }
   }
 
-  const uid = m.user.id;
-  const playlists = read().playlists?.[uid] || {};
+  const playlists = getGuildPlaylists(m.guildId);
   const names = Object.keys(playlists);
   const filtered = focused.value ? names.filter((n) => n.includes(focused.value.toLowerCase())) : names;
   return filtered.slice(0, 10).map((n) => ({ name: n.slice(0, 100), value: n }));

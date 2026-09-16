@@ -13,7 +13,17 @@
 import { AudioPlayerStatus } from '@discordjs/voice';
 import { ApplicationIntegrationType, InteractionContextType, MessageFlags, SlashCommandBuilder } from 'discord.js';
 import { Browser, pen, Role } from '#mushi';
-import { connect, formatDuration, getState, getYT, playSong, resolveSong, sendPlayerUI } from './_player.js';
+import {
+  connect,
+  formatDuration,
+  getGuildPlaylists,
+  getState,
+  getYT,
+  playSong,
+  resolveSong,
+  saveGuildPlaylists,
+  sendPlayerUI,
+} from './_player.js';
 
 async function exec(c) {
   const query = c.event.options.getString('query') || '';
@@ -36,6 +46,18 @@ async function exec(c) {
 
     if (!state.textChannel) state.textChannel = c.event.channel;
 
+    const playlists = getGuildPlaylists(guild.id);
+    if (!state.activePlaylist) {
+      state.activePlaylist = 'default';
+    }
+    if (!playlists[state.activePlaylist]) {
+      playlists[state.activePlaylist] = [];
+      saveGuildPlaylists(guild.id, playlists);
+    }
+    if (state.tracks.length === 0 && playlists[state.activePlaylist].length > 0) {
+      state.tracks = [...playlists[state.activePlaylist]];
+    }
+
     const isUrl = /^https?:\/\//.test(query);
     const isPlaylist =
       /youtube\.com\/playlist\?list=/.test(query) ||
@@ -45,8 +67,9 @@ async function exec(c) {
       const entries = await yt.getPlaylistInfo(query);
       const limit = 50;
       const items = entries.slice(0, limit);
+      const newTracks = [];
       for (const e of items) {
-        state.songs.push({
+        newTracks.push({
           url: `https://youtube.com/watch?v=${e.id}`,
           title: e.title || 'Unknown',
           duration: e.duration || 0,
@@ -54,14 +77,21 @@ async function exec(c) {
           requester: c.senderId,
         });
       }
+      state.tracks.push(...newTracks);
+      playlists[state.activePlaylist].push(...newTracks);
+      saveGuildPlaylists(guild.id, playlists);
+
       const isPlaying = state.current !== null && state.player.state.status !== AudioPlayerStatus.Idle;
       if (!isPlaying) {
+        if (state.currentIndex === -1 || state.currentIndex >= state.tracks.length) {
+          state.currentIndex = state.tracks.length - newTracks.length;
+        }
         await connect(guild, voiceChannel);
         playSong(guild);
       } else {
         await sendPlayerUI(state);
       }
-      const msg = `Added **${items.length}** songs from playlist${items.length < entries.length ? ` (showing first ${limit})` : ''}.`;
+      const msg = `Added **${items.length}** songs to playlist **${state.activePlaylist}**${items.length < entries.length ? ` (showing first ${limit})` : ''}.`;
       await c.event.editReply(msg);
     } else {
       const song = await resolveSong(query);
@@ -72,9 +102,14 @@ async function exec(c) {
       song.requester = c.senderId;
 
       const isPlaying = state.current !== null && state.player.state.status !== AudioPlayerStatus.Idle;
-      state.songs.push(song);
+      state.tracks.push(song);
+      playlists[state.activePlaylist].push(song);
+      saveGuildPlaylists(guild.id, playlists);
 
       if (!isPlaying) {
+        if (state.currentIndex === -1 || state.currentIndex >= state.tracks.length) {
+          state.currentIndex = state.tracks.length - 1;
+        }
         await connect(guild, voiceChannel);
         playSong(guild);
       } else {
@@ -82,7 +117,7 @@ async function exec(c) {
       }
 
       const msg = isPlaying
-        ? `Added to queue: **${song.title}** (${formatDuration(song.duration)})`
+        ? `Added to playlist **${state.activePlaylist}**: **${song.title}** (${formatDuration(song.duration)})`
         : `Now playing: **${song.title}** (${formatDuration(song.duration)})`;
 
       await c.event.editReply(msg);

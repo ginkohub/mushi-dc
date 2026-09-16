@@ -17,17 +17,23 @@ async function exec(c) {
   if (!guild) return await c.react('❌');
 
   const state = getState(guild.id);
-  if (state.songs.length === 0 && !state.current) return await c.reply('Queue is empty.');
+  if (state.tracks.length === 0) return await c.reply('Playlist is empty.');
 
-  const lines = [];
+  const plName = state.activePlaylist || 'default';
+  const lines = [`**Playlist:** ${plName} (${state.tracks.length} songs)`];
 
-  if (state.current) {
-    lines.push(`**Now Playing:** ${state.current.title} (${formatDuration(state.current.duration)})`);
-  }
+  const list = state.tracks
+    .slice(0, 25)
+    .map((s, i) => {
+      const isCurrent = i === state.currentIndex;
+      const marker = isCurrent ? '▶️ ' : '   ';
+      return `\`${marker}${i + 1}.\` ${s.title} (${formatDuration(s.duration)})`;
+    })
+    .join('\n');
 
-  if (state.songs.length > 0) {
-    const list = state.songs.map((s, i) => `**${i + 1}.** ${s.title} (${formatDuration(s.duration)})`).join('\n');
-    lines.push(`**Queue (${state.songs.length}):**\n${list}`);
+  lines.push(list);
+  if (state.tracks.length > 25) {
+    lines.push(`*+${state.tracks.length - 25} more*`);
   }
 
   await c.reply(lines.join('\n\n'));

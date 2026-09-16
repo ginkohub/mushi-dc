@@ -88,6 +88,22 @@ async function resolveSong(query) {
   };
 }
 
+function getGuildPlaylists(guildId) {
+  const data = read();
+  if (!data.guildPlaylists) data.guildPlaylists = {};
+  if (!data.guildPlaylists[guildId]) {
+    data.guildPlaylists[guildId] = {};
+  }
+  return data.guildPlaylists[guildId];
+}
+
+function saveGuildPlaylists(guildId, playlists) {
+  const data = read();
+  if (!data.guildPlaylists) data.guildPlaylists = {};
+  data.guildPlaylists[guildId] = playlists;
+  write(data);
+}
+
 function playerUI(state) {
   const s = state.current;
   if (!s) return null;
@@ -95,17 +111,21 @@ function playerUI(state) {
   const paused = state.player.state.status === 'paused';
 
   const loopEmoji = state.loopMode === 1 ? '🔂' : state.loopMode === 2 ? '🔁' : '';
-  const loopStr = loopEmoji || '';
+  const loopStr = loopEmoji ? `${loopEmoji} ` : '';
 
   const bar = progressBar(state);
-  let desc = `${bar}\n${loopStr}Volume: ${Math.round(state.volume * 100)}% | Requested by: <@${s.requester}>`;
+  const plHeader = state.activePlaylist
+    ? `Playlist: **${state.activePlaylist}** (${state.currentIndex + 1}/${state.tracks.length})\n`
+    : '';
+  let desc = `${plHeader}${bar}\n${loopStr}Volume: ${Math.round(state.volume * 100)}% | Requested by: <@${s.requester}>`;
 
-  if (state.songs.length > 0) {
-    const next = state.songs.slice(0, 5);
-    const total = state.songs.length;
+  const upNext = state.songs;
+  if (upNext.length > 0) {
+    const next = upNext.slice(0, 5);
+    const total = upNext.length;
     desc += `\n\n**Up next (${total}):**`;
     for (let i = 0; i < next.length; i++) {
-      desc += `\n\`${i + 1}.\` ${next[i].title}`;
+      desc += `\n\`${state.currentIndex + 2 + i}.\` ${next[i].title}`;
     }
     if (total > 5) desc += `\n*+${total - 5} more*`;
   }
@@ -215,8 +235,9 @@ function startProgressTimer(state) {
 class GuildState {
   constructor(guildId) {
     this.guildId = guildId;
-    this.songs = [];
-    this.current = null;
+    this.activePlaylist = null;
+    this.tracks = [];
+    this.currentIndex = -1;
     this.connection = null;
     this.player = createAudioPlayer({
       behaviors: { noSubscriber: NoSubscriberBehavior.Pause },
@@ -228,12 +249,23 @@ class GuildState {
     this.pausedAt = null;
     this.pausedTotal = 0;
     this.progressInterval = null;
-    this.history = [];
     this.nextDc = null;
     this.ffmpeg = null;
     this.ytproc = null;
     this.playerMsg = null;
-    this.currentPlaylist = null;
+    this.skipRequested = false;
+  }
+
+  get current() {
+    if (this.currentIndex >= 0 && this.currentIndex < this.tracks.length) {
+      return this.tracks[this.currentIndex];
+    }
+    return null;
+  }
+
+  get songs() {
+    if (this.currentIndex < 0) return this.tracks;
+    return this.tracks.slice(this.currentIndex + 1);
   }
 }
 
@@ -254,37 +286,58 @@ function getState(guildId) {
       stopProgressTimer(state);
       state.pausedAt = null;
       state.pausedTotal = 0;
+      killProcs(state);
 
-      if (state.ytproc) {
-        state.ytproc.kill();
-        state.ytproc = null;
-      }
-      if (state.ffmpeg) {
-        state.ffmpeg.kill();
-        state.ffmpeg = null;
+      const g = guilds.get(guildId);
+
+      if (state.skipRequested) {
+        state.skipRequested = false;
+        if (state.loopMode === 2 && state.tracks.length > 0) {
+          state.currentIndex = (state.currentIndex + 1) % state.tracks.length;
+        } else {
+          state.currentIndex++;
+        }
+        if (state.currentIndex < state.tracks.length) {
+          if (g) playSong(g);
+        } else {
+          state.currentIndex = -1;
+          removePlayerUI(state);
+          if (state.connection) {
+            state.nextDc = setTimeout(() => {
+              if (state.currentIndex === -1) {
+                const tc = state.textChannel;
+                cleanup(guildId);
+                if (tc) tc.send('Playlist ended, leaving voice channel.').catch(() => {});
+              }
+            }, 60_000);
+          }
+        }
+        return;
       }
 
       if (state.loopMode === 1 && state.current) {
-        state.songs.unshift({ ...state.current });
-        state.current = null;
-      } else if (state.loopMode === 2 && state.current) {
-        state.songs.push({ ...state.current });
-        state.current = null;
+        if (g) playSong(g);
+        return;
       }
 
-      if (state.songs.length > 0) {
-        const g = guilds.get(guildId);
+      if (state.loopMode === 2 && state.tracks.length > 0) {
+        state.currentIndex = (state.currentIndex + 1) % state.tracks.length;
+        if (g) playSong(g);
+        return;
+      }
+
+      state.currentIndex++;
+      if (state.currentIndex < state.tracks.length) {
         if (g) playSong(g);
       } else {
-        state.current = null;
-        state.currentPlaylist = null;
+        state.currentIndex = -1;
         removePlayerUI(state);
         if (state.connection) {
           state.nextDc = setTimeout(() => {
-            if (state.songs.length === 0 && !state.current) {
+            if (state.currentIndex === -1) {
               const tc = state.textChannel;
               cleanup(guildId);
-              if (tc) tc.send('Queue ended, leaving voice channel.').catch(() => {});
+              if (tc) tc.send('Playlist ended, leaving voice channel.').catch(() => {});
             }
           }, 60_000);
         }
@@ -295,12 +348,12 @@ function getState(guildId) {
       pen.Error('AudioPlayer error', err);
       stopProgressTimer(state);
       killProcs(state);
-      if (state.songs.length > 0) {
-        const g = guilds.get(guildId);
+      const g = guilds.get(guildId);
+      state.currentIndex++;
+      if (state.currentIndex < state.tracks.length) {
         if (g) playSong(g);
       } else {
-        state.current = null;
-        state.currentPlaylist = null;
+        state.currentIndex = -1;
         removePlayerUI(state);
       }
     });
@@ -359,14 +412,12 @@ function killProcs(state) {
 function disconnect(guildId) {
   const state = getState(guildId);
   stopProgressTimer(state);
-  state.songs = [];
-  state.current = null;
-  state.currentPlaylist = null;
-  state.history = [];
+  state.currentIndex = -1;
   state.loopMode = 0;
   state.startedAt = null;
   state.pausedAt = null;
   state.pausedTotal = 0;
+  state.skipRequested = false;
   state.player.stop();
   killProcs(state);
   if (state.connection) {
@@ -383,14 +434,12 @@ function disconnect(guildId) {
 function cleanup(guildId) {
   const state = getState(guildId);
   stopProgressTimer(state);
-  state.songs = [];
-  state.current = null;
-  state.currentPlaylist = null;
-  state.history = [];
+  state.currentIndex = -1;
   state.loopMode = 0;
   state.startedAt = null;
   state.pausedAt = null;
   state.pausedTotal = 0;
+  state.skipRequested = false;
   state.player.stop();
   killProcs(state);
   if (state.connection) {
@@ -413,14 +462,12 @@ async function playSong(guild) {
     state.nextDc = null;
   }
 
-  if (state.songs.length === 0) {
-    state.current = null;
+  if (state.currentIndex < 0 || state.currentIndex >= state.tracks.length) {
+    state.currentIndex = -1;
     return;
   }
 
-  if (state.current) state.history.push(state.current);
-  const song = state.songs.shift();
-  state.current = song;
+  const song = state.tracks[state.currentIndex];
   state.startedAt = Date.now();
   state.pausedAt = null;
   state.pausedTotal = 0;
@@ -482,6 +529,7 @@ async function playSong(guild) {
     if (state.textChannel) {
       state.textChannel.send(`Failed to play **${song.title}**: ${err.message}`).catch(() => {});
     }
+    state.currentIndex++;
     playSong(guild);
   }
 }
@@ -559,29 +607,90 @@ async function seekTo(guild, position) {
 
 function shuffleQueue(guildId) {
   const state = getState(guildId);
-  for (let i = state.songs.length - 1; i > 0; i--) {
+  if (state.tracks.length < 2) return;
+  const currentSong = state.current;
+
+  for (let i = state.tracks.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [state.songs[i], state.songs[j]] = [state.songs[j], state.songs[i]];
+    [state.tracks[i], state.tracks[j]] = [state.tracks[j], state.tracks[i]];
+  }
+
+  if (currentSong) {
+    state.currentIndex = state.tracks.indexOf(currentSong);
+  }
+
+  if (state.activePlaylist) {
+    const playlists = getGuildPlaylists(guildId);
+    playlists[state.activePlaylist] = [...state.tracks];
+    saveGuildPlaylists(guildId, playlists);
   }
 }
 
 function removeFromQueue(guildId, index) {
   const state = getState(guildId);
-  if (index < 1 || index > state.songs.length) return null;
-  return state.songs.splice(index - 1, 1)[0];
+  if (index < 1 || index > state.tracks.length) return null;
+  const trackIdx = index - 1;
+  const [removed] = state.tracks.splice(trackIdx, 1);
+
+  if (trackIdx < state.currentIndex) {
+    state.currentIndex--;
+  } else if (trackIdx === state.currentIndex) {
+    if (state.currentIndex >= state.tracks.length) {
+      if (state.loopMode === 2 && state.tracks.length > 0) {
+        state.currentIndex = 0;
+      } else {
+        state.currentIndex = -1;
+      }
+    }
+    const g = guilds.get(guildId);
+    if (g && state.currentIndex >= 0) {
+      playSong(g);
+    } else {
+      state.player.stop();
+      killProcs(state);
+      removePlayerUI(state);
+    }
+  }
+
+  if (state.activePlaylist) {
+    const playlists = getGuildPlaylists(guildId);
+    playlists[state.activePlaylist] = [...state.tracks];
+    saveGuildPlaylists(guildId, playlists);
+  }
+  return removed;
 }
 
 function clearQueue(guildId) {
   const state = getState(guildId);
-  state.songs = [];
-  state.currentPlaylist = null;
+  state.tracks = [];
+  state.currentIndex = -1;
+  stopProgressTimer(state);
+  state.player.stop();
+  killProcs(state);
+  removePlayerUI(state);
+  if (state.activePlaylist) {
+    const playlists = getGuildPlaylists(guildId);
+    playlists[state.activePlaylist] = [];
+    saveGuildPlaylists(guildId, playlists);
+  }
 }
 
 function moveInQueue(guildId, from, to) {
   const state = getState(guildId);
-  if (from < 1 || from > state.songs.length || to < 1 || to > state.songs.length) return false;
-  const [item] = state.songs.splice(from - 1, 1);
-  state.songs.splice(to - 1, 0, item);
+  if (from < 1 || from > state.tracks.length || to < 1 || to > state.tracks.length) return false;
+  const currentSong = state.current;
+  const [item] = state.tracks.splice(from - 1, 1);
+  state.tracks.splice(to - 1, 0, item);
+
+  if (currentSong) {
+    state.currentIndex = state.tracks.indexOf(currentSong);
+  }
+
+  if (state.activePlaylist) {
+    const playlists = getGuildPlaylists(guildId);
+    playlists[state.activePlaylist] = [...state.tracks];
+    saveGuildPlaylists(guildId, playlists);
+  }
   return true;
 }
 
@@ -592,38 +701,38 @@ function setLoop(guildId, mode) {
 
 function saveQueue(guildId, name, uid) {
   const state = getState(guildId);
-  const data = read();
-  if (!data.playlists) data.playlists = {};
-  if (!data.playlists[uid]) data.playlists[uid] = {};
-  data.playlists[uid][name] = state.songs.map((s) => ({
+  const playlists = getGuildPlaylists(guildId);
+  playlists[name] = state.tracks.map((s) => ({
     url: s.url,
     title: s.title,
     duration: s.duration,
     thumbnail: s.thumbnail,
+    requester: s.requester || uid,
   }));
-  write(data);
+  saveGuildPlaylists(guildId, playlists);
 }
 
 function previousTrack(guildId) {
   const state = getState(guildId);
-  if (state.history.length === 0) return false;
-  if (state.current) state.songs.unshift(state.current);
-  state.songs.unshift(state.history.pop());
-  state.current = null;
-  skip(guildId);
+  if (state.tracks.length === 0) return false;
+
+  killProcs(state);
+  if (state.currentIndex > 0) {
+    state.currentIndex--;
+  } else if (state.loopMode === 2) {
+    state.currentIndex = state.tracks.length - 1;
+  } else {
+    state.currentIndex = 0;
+  }
+  const g = guilds.get(guildId);
+  if (g) playSong(g);
   return true;
 }
 
 function skip(guildId) {
   const state = getState(guildId);
-  if (state.ytproc) {
-    state.ytproc.kill();
-    state.ytproc = null;
-  }
-  if (state.ffmpeg) {
-    state.ffmpeg.kill();
-    state.ffmpeg = null;
-  }
+  killProcs(state);
+  state.skipRequested = true;
   state.player.stop();
 }
 
@@ -651,6 +760,7 @@ export {
   connect,
   disconnect,
   formatDuration,
+  getGuildPlaylists,
   getState,
   getYT,
   guilds,
@@ -660,6 +770,7 @@ export {
   removeFromQueue,
   removePlayerUI,
   resolveSong,
+  saveGuildPlaylists,
   saveQueue,
   seekTo,
   sendPlayerUI,
