@@ -33,6 +33,7 @@ async function exec(c) {
   if (!guild) return;
 
   const state = getState(guild.id);
+  if (!state.playerMsg || c.event.message.id !== state.playerMsg.id) return;
 
   switch (id) {
     case 'mp_pause': {
