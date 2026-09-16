@@ -31,7 +31,7 @@ async function exec(c) {
 }
 
 const volSlash = {
-  roles: [Role.USER],
+  roles: [Role.GUEST],
   data: new SlashCommandBuilder()
     .setName('volume')
     .setDescription('Set or show playback volume (0-200)')

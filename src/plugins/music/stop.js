@@ -25,7 +25,7 @@ async function exec(c) {
 }
 
 const stopSlash = {
-  roles: [Role.USER],
+  roles: [Role.GUEST],
   data: new SlashCommandBuilder()
     .setName('stop')
     .setDescription('Stop playing and leave the voice channel')

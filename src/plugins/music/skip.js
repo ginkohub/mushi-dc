@@ -26,7 +26,7 @@ async function exec(c) {
 }
 
 const skipSlash = {
-  roles: [Role.USER],
+  roles: [Role.GUEST],
   data: new SlashCommandBuilder()
     .setName('skip')
     .setDescription('Skip the currently playing song')

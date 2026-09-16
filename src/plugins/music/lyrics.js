@@ -96,7 +96,7 @@ async function autocomplete(m) {
 }
 
 const lyricsSlash = {
-  roles: [Role.USER],
+  roles: [Role.GUEST],
   autocomplete,
   data: new SlashCommandBuilder()
     .setName('lyrics')

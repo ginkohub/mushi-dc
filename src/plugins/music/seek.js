@@ -46,7 +46,7 @@ async function exec(c) {
 }
 
 const seekSlash = {
-  roles: [Role.USER],
+  roles: [Role.GUEST],
   data: new SlashCommandBuilder()
     .setName('seek')
     .setDescription('Seek to a position in the current song')

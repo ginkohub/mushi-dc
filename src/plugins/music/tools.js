@@ -112,7 +112,7 @@ async function execSave(c) {
 }
 
 const shuffleSlash = {
-  roles: [Role.USER],
+  roles: [Role.GUEST],
   data: new SlashCommandBuilder()
     .setName('shuffle')
     .setDescription('Shuffle the current queue')
@@ -122,7 +122,7 @@ const shuffleSlash = {
 };
 
 const clearSlash = {
-  roles: [Role.USER],
+  roles: [Role.GUEST],
   data: new SlashCommandBuilder()
     .setName('clear')
     .setDescription('Clear the entire queue')
@@ -132,7 +132,7 @@ const clearSlash = {
 };
 
 const loopSlash = {
-  roles: [Role.USER],
+  roles: [Role.GUEST],
   data: new SlashCommandBuilder()
     .setName('loop')
     .setDescription('Set loop mode')
@@ -149,7 +149,7 @@ const loopSlash = {
 };
 
 const removeSlash = {
-  roles: [Role.USER],
+  roles: [Role.GUEST],
   data: new SlashCommandBuilder()
     .setName('remove')
     .setDescription('Remove a song from queue by index')
@@ -160,7 +160,7 @@ const removeSlash = {
 };
 
 const moveSlash = {
-  roles: [Role.USER],
+  roles: [Role.GUEST],
   data: new SlashCommandBuilder()
     .setName('move')
     .setDescription('Move a song in the queue')
@@ -172,7 +172,7 @@ const moveSlash = {
 };
 
 const saveSlash = {
-  roles: [Role.USER],
+  roles: [Role.GUEST],
   data: new SlashCommandBuilder()
     .setName('save')
     .setDescription('Save current queue as a playlist')

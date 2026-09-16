@@ -38,7 +38,7 @@ async function exec(c) {
 }
 
 const pauseSlash = {
-  roles: [Role.USER],
+  roles: [Role.GUEST],
   data: new SlashCommandBuilder()
     .setName('pause')
     .setDescription('Pause/resume the current song')

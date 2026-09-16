@@ -165,7 +165,7 @@ async function autocomplete(event, signal) {
 }
 
 const playSlash = {
-  roles: [Role.USER],
+  roles: [Role.GUEST],
   autocomplete,
   data: new SlashCommandBuilder()
     .setName('play')

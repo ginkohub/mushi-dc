@@ -33,7 +33,7 @@ async function exec(c) {
 }
 
 const npSlash = {
-  roles: [Role.USER],
+  roles: [Role.GUEST],
   data: new SlashCommandBuilder()
     .setName('nowplaying')
     .setDescription('Show the currently playing song')

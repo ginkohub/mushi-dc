@@ -40,7 +40,7 @@ async function exec(c) {
 }
 
 const queueSlash = {
-  roles: [Role.USER],
+  roles: [Role.GUEST],
   data: new SlashCommandBuilder()
     .setName('queue')
     .setDescription('Show the current song queue')

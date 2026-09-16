@@ -200,7 +200,7 @@ async function autocomplete(m, signal) {
 }
 
 const plSlash = {
-  roles: [Role.USER],
+  roles: [Role.GUEST],
   autocomplete,
   data: new SlashCommandBuilder()
     .setName('playlist')
