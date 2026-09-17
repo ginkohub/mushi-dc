@@ -16,10 +16,13 @@ import { Browser, Role } from '#mushi';
 import {
   clearQueue,
   connect,
+  dedupeTracks,
   formatDuration,
   getGuildPlaylists,
   getState,
+  getTrackKey,
   getYT,
+  isDuplicateTrack,
   playSong,
   removeFromQueue,
   resolveSong,
@@ -91,6 +94,9 @@ async function exec(c) {
         if (!playlists[name]) return await c.event.editReply(`Playlist **${name}** not found.`);
         const song = await resolveSong(query);
         if (!song) return await c.event.editReply('No results found.');
+        if (isDuplicateTrack(song, playlists[name])) {
+          return await c.event.editReply(`**${song.title}** is already in playlist **${name}**.`);
+        }
         song.requester = uid;
         playlists[name].push(song);
         saveGuildPlaylists(guild.id, playlists);
@@ -115,6 +121,33 @@ async function exec(c) {
         }
 
         await c.event.editReply(`Added **${song.title}** to **${name}**.`);
+        break;
+      }
+      case 'dedupe': {
+        if (!name || !playlists[name]) return await c.event.editReply(`Playlist **${name}** not found.`);
+        const pl = playlists[name];
+        if (pl.length === 0) return await c.event.editReply(`Playlist **${name}** is empty.`);
+        const originalCount = pl.length;
+        const deduped = dedupeTracks(pl);
+        const removedCount = originalCount - deduped.length;
+        if (removedCount === 0) {
+          return await c.event.editReply(`Playlist **${name}** has no duplicates.`);
+        }
+        playlists[name] = deduped;
+        saveGuildPlaylists(guild.id, playlists);
+
+        const state = getState(guild.id);
+        if (state.activePlaylist === name) {
+          const currentSong = state.current;
+          state.tracks = [...deduped];
+          if (currentSong) {
+            const newIdx = state.tracks.findIndex((t) => getTrackKey(t) === getTrackKey(currentSong));
+            state.currentIndex = newIdx !== -1 ? newIdx : Math.min(state.currentIndex, state.tracks.length - 1);
+          }
+          await sendPlayerUI(state);
+        }
+
+        await c.event.editReply(`Removed **${removedCount}** duplicate(s) from playlist **${name}**.`);
         break;
       }
       case 'remove': {
@@ -247,6 +280,14 @@ const plSlash = {
           o.setName('name').setDescription('Playlist name').setRequired(true).setAutocomplete(true),
         )
         .addIntegerOption((o) => o.setName('index').setDescription('Song index to remove').setRequired(true)),
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName('dedupe')
+        .setDescription('Remove duplicate songs from a playlist')
+        .addStringOption((o) =>
+          o.setName('name').setDescription('Playlist name').setRequired(true).setAutocomplete(true),
+        ),
     )
     .addSubcommand((sub) =>
       sub

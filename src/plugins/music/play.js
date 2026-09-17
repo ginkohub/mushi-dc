@@ -18,7 +18,9 @@ import {
   formatDuration,
   getGuildPlaylists,
   getState,
+  getTrackKey,
   getYT,
+  isDuplicateTrack,
   playSong,
   resolveSong,
   saveGuildPlaylists,
@@ -67,16 +69,31 @@ async function exec(c) {
       const entries = await yt.getPlaylistInfo(query);
       const limit = 50;
       const items = entries.slice(0, limit);
+      const existingKeys = new Set([
+        ...state.tracks.map(getTrackKey),
+        ...(playlists[state.activePlaylist] || []).map(getTrackKey),
+      ]);
       const newTracks = [];
       for (const e of items) {
-        newTracks.push({
+        const track = {
           url: `https://youtube.com/watch?v=${e.id}`,
           title: e.title || 'Unknown',
           duration: e.duration || 0,
           thumbnail: e.thumbnail || null,
           requester: c.senderId,
-        });
+        };
+        const key = getTrackKey(track);
+        if (key && !existingKeys.has(key)) {
+          existingKeys.add(key);
+          newTracks.push(track);
+        }
       }
+
+      if (newTracks.length === 0) {
+        await c.event.editReply('All songs from this playlist are already in the queue.');
+        return;
+      }
+
       state.tracks.push(...newTracks);
       playlists[state.activePlaylist].push(...newTracks);
       saveGuildPlaylists(guild.id, playlists);
@@ -91,7 +108,10 @@ async function exec(c) {
       } else {
         await sendPlayerUI(state);
       }
-      const msg = `Added **${items.length}** songs to playlist **${state.activePlaylist}**${items.length < entries.length ? ` (showing first ${limit})` : ''}.`;
+      const skippedCount = items.length - newTracks.length;
+      const skippedText = skippedCount > 0 ? ` (${skippedCount} duplicate(s) skipped)` : '';
+      const limitText = items.length < entries.length ? ` (showing first ${limit})` : '';
+      const msg = `Added **${newTracks.length}** songs to playlist **${state.activePlaylist}**${skippedText}${limitText}.`;
       await c.event.editReply(msg);
     } else {
       const song = await resolveSong(query);
@@ -102,6 +122,18 @@ async function exec(c) {
       song.requester = c.senderId;
 
       const isPlaying = state.current !== null && state.player.state.status !== AudioPlayerStatus.Idle;
+      const activeQueue = isPlaying && state.currentIndex >= 0 ? state.tracks.slice(state.currentIndex) : [];
+      if (activeQueue.length > 0 && isDuplicateTrack(song, activeQueue)) {
+        await c.event.editReply(`**${song.title}** is already in the queue.`);
+        return;
+      }
+
+      const isNamedPlaylist = state.activePlaylist && state.activePlaylist !== 'default';
+      if (isNamedPlaylist && isDuplicateTrack(song, playlists[state.activePlaylist])) {
+        await c.event.editReply(`**${song.title}** is already in playlist **${state.activePlaylist}**.`);
+        return;
+      }
+
       state.tracks.push(song);
       playlists[state.activePlaylist].push(song);
       saveGuildPlaylists(guild.id, playlists);

@@ -88,6 +88,42 @@ async function resolveSong(query) {
   };
 }
 
+function getTrackKey(track) {
+  if (!track) return '';
+  const url = typeof track === 'string' ? track : track.url;
+  if (url) {
+    const ytMatch = url.match(/(?:v=|\/embed\/|youtu\.be\/|\/v\/|\/shorts\/)([\w-]{11})/);
+    if (ytMatch) return `yt:${ytMatch[1]}`;
+    try {
+      const u = new URL(url);
+      return `${u.origin}${u.pathname}`;
+    } catch {
+      return url.trim().toLowerCase();
+    }
+  }
+  const title = typeof track === 'object' ? track.title : null;
+  return title ? `title:${title.trim().toLowerCase()}` : '';
+}
+
+function isDuplicateTrack(track, list) {
+  if (!track || !list?.length) return false;
+  const key = getTrackKey(track);
+  if (!key) return false;
+  return list.some((t) => getTrackKey(t) === key);
+}
+
+function dedupeTracks(tracks) {
+  if (!tracks?.length) return [];
+  const seen = new Set();
+  return tracks.filter((t) => {
+    const key = getTrackKey(t);
+    if (!key) return true;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 function getGuildPlaylists(guildId) {
   const data = read();
   if (!data.guildPlaylists) data.guildPlaylists = {};
@@ -702,7 +738,7 @@ function setLoop(guildId, mode) {
 function saveQueue(guildId, name, uid) {
   const state = getState(guildId);
   const playlists = getGuildPlaylists(guildId);
-  playlists[name] = state.tracks.map((s) => ({
+  playlists[name] = dedupeTracks(state.tracks).map((s) => ({
     url: s.url,
     title: s.title,
     duration: s.duration,
@@ -758,12 +794,15 @@ export {
   cleanup,
   clearQueue,
   connect,
+  dedupeTracks,
   disconnect,
   formatDuration,
   getGuildPlaylists,
   getState,
+  getTrackKey,
   getYT,
   guilds,
+  isDuplicateTrack,
   moveInQueue,
   playSong,
   previousTrack,
