@@ -13,8 +13,6 @@
  */
 
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync } from 'node:fs';
-import { join, resolve } from 'node:path';
 import {
   AudioPlayerStatus,
   createAudioPlayer,
@@ -26,8 +24,7 @@ import {
   VoiceConnectionStatus,
 } from '@discordjs/voice';
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
-import YtDlpWrap from 'yt-dlp-wrap';
-import { read, write } from '#mushi';
+import { getYT, read, write } from '#mushi';
 import pen from '#mushi/pen.js';
 
 let ffmpegPath = 'ffmpeg';
@@ -35,34 +32,6 @@ try {
   ffmpegPath = (await import('ffmpeg-static')).default;
 } catch {}
 
-const BIN_DIR = resolve('./bin');
-
-function resolveYT() {
-  const paths = [
-    join(BIN_DIR, process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp'),
-    resolve('./node_modules/.bin/yt-dlp'),
-    resolve('bin/yt-dlp'),
-  ];
-  for (const p of paths) {
-    if (existsSync(p)) return p;
-  }
-  if (!existsSync(BIN_DIR)) mkdirSync(BIN_DIR, { recursive: true });
-  return YtDlpWrap.downloadBinary(BIN_DIR);
-}
-
-let ytInit = null;
-let ytInstance = null;
-async function getYT() {
-  if (!ytInstance) {
-    if (!ytInit)
-      ytInit = Promise.resolve(resolveYT()).then((bin) => {
-        ytInstance = new YtDlpWrap(bin);
-        return ytInstance;
-      });
-    ytInstance = await ytInit;
-  }
-  return ytInstance;
-}
 getYT().catch(() => {});
 
 async function resolveSong(query) {

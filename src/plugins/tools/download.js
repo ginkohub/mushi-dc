@@ -12,37 +12,8 @@
  *   siputzx.my.id - unofficial API aggregator
  */
 
-import { existsSync, mkdirSync } from 'node:fs';
-import { join, resolve } from 'node:path';
 import { ApplicationIntegrationType, InteractionContextType, MessageFlags, SlashCommandBuilder } from 'discord.js';
-import YtDlpWrap from 'yt-dlp-wrap';
-import { Browser, pen, Role } from '#mushi';
-
-const BIN_DIR = resolve('./bin');
-const YTDLP_PATHS = [
-  join(BIN_DIR, process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp'),
-  resolve('./node_modules/.bin/yt-dlp'),
-  resolve('bin/yt-dlp'),
-];
-
-let ytDlpPromise = null;
-
-async function resolveYT() {
-  for (const p of YTDLP_PATHS) {
-    if (existsSync(p)) return p;
-  }
-  if (!existsSync(BIN_DIR)) mkdirSync(BIN_DIR, { recursive: true });
-  return await YtDlpWrap.downloadBinary(BIN_DIR);
-}
-
-async function getYT() {
-  if (!ytDlpPromise) {
-    ytDlpPromise = resolveYT().then((bin) => new YtDlpWrap(bin));
-  }
-  return ytDlpPromise;
-}
-
-getYT().catch(() => {});
+import { Browser, getYT, pen, Role } from '#mushi';
 
 const YTDLP_SITES = /youtube\.com|youtu\.be|soundcloud\.com|twitter\.com|x\.com|reddit\.com/;
 const MAX_FILE_SIZE = 10 * 1024 * 1024;

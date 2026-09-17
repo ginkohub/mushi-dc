@@ -20,3 +20,4 @@ export * from './translate.js';
 export * from './user_manager.js';
 export * from './weather.js';
 export * from './wiki.js';
+export * from './ytdlp.js';
