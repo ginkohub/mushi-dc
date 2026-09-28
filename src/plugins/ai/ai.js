@@ -38,6 +38,10 @@ const t = translate({
   },
 });
 
+function getHistoryKey(msg) {
+  return msg.guild?.id || msg.guildId || msg.channel?.id || msg.author?.id || 'dm';
+}
+
 function splitText(text, maxLen = 2000) {
   if (text.length <= maxLen) return [text];
   const splitLong = (s) => {
@@ -71,11 +75,11 @@ function splitText(text, maxLen = 2000) {
   return chunks;
 }
 
-async function askGemini(channelId, prompt, info) {
+async function askGemini(historyKey, prompt, info) {
   const client = getClient();
   if (!client) return { status: false, error: 'no_cookies' };
 
-  const historyText = formatHistory(channelId);
+  const historyText = formatHistory(historyKey);
   const fullPrompt = historyText ? `${historyText}${prompt}` : prompt;
 
   try {
@@ -91,8 +95,8 @@ async function askGemini(channelId, prompt, info) {
   }
 }
 
-function remember(channelId, prompt, reply, userMsgId, botMsgId, userName, botName) {
-  addHistory(channelId, [
+function remember(historyKey, prompt, reply, userMsgId, botMsgId, userName, botName) {
+  addHistory(historyKey, [
     {
       role: 'user',
       name: userName,
@@ -108,9 +112,9 @@ function remember(channelId, prompt, reply, userMsgId, botMsgId, userName, botNa
       id: botMsgId,
     },
   ]);
-  if (shouldCompact(channelId)) {
+  if (shouldCompact(historyKey)) {
     const client = getClient();
-    if (client) summarizeHistory(channelId, client);
+    if (client) summarizeHistory(historyKey, client);
   }
 }
 
@@ -126,7 +130,7 @@ async function sendChunks(text, sender) {
 
 const chatExec = async (c) => {
   const query = c.event.options.getString('text');
-  const channelId = c.event.channel?.id || c.event.user?.id;
+  const historyKey = getHistoryKey(c.event);
   await c.event.deferReply();
   try {
     const info = {
@@ -135,7 +139,7 @@ const chatExec = async (c) => {
       server: c.event.guild?.name || null,
       bot: c.client()?.user?.username || null,
     };
-    const res = await askGemini(channelId, query, info);
+    const res = await askGemini(historyKey, query, info);
     if (!res.status) {
       pen.Error('AI', res.error);
       if (res.error === 'no_cookies') {
@@ -154,7 +158,7 @@ const chatExec = async (c) => {
       await c.event.followUp(chunks[i]);
     }
     if (sent?.id) geminiMessages.add(sent.id);
-    remember(channelId, query, res.text, c.event.id, sent?.id, userName, botName);
+    remember(historyKey, query, res.text, c.event.id, sent?.id, userName, botName);
   } catch (e) {
     pen.Error('AI', e);
     await c.event.editReply('❌').catch(() => {});
@@ -183,7 +187,7 @@ const replyExec = async (c) => {
   } catch {}
   if (!query) return;
 
-  const channelId = msg.channel?.id || msg.author?.id;
+  const historyKey = getHistoryKey(msg);
   try {
     const info = {
       user: { name: msg.author?.globalName, username: msg.author?.username },
@@ -191,7 +195,7 @@ const replyExec = async (c) => {
       server: msg.guild?.name || null,
       bot: c.client()?.user?.username || null,
     };
-    const res = await askGemini(channelId, query, info);
+    const res = await askGemini(historyKey, query, info);
     if (!res.status) {
       pen.Error('AI', res.error);
       if (res.error === 'no_cookies') return;
@@ -201,7 +205,7 @@ const replyExec = async (c) => {
     const userName = msg.author?.globalName || msg.author?.username || 'User';
     const botName = c.client()?.user?.username || 'Gemini';
     const sent = await sendChunks(res.text, (text) => msg.reply(text));
-    remember(channelId, query, res.text, msg.id, sent?.id, userName, botName);
+    remember(historyKey, query, res.text, msg.id, sent?.id, userName, botName);
   } catch (e) {
     pen.Error('AI', e);
     await msg.react('❌').catch(() => {});

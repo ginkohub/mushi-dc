@@ -208,13 +208,12 @@ async function handleCompact(c) {
   }
 
   if (action === 'now') {
-    const channelId = c.event.channel?.id;
-    if (!channelId) return await c.reply('No channel context.');
-    const h = getHistory(channelId);
+    const historyKey = c.event.guild?.id || c.event.guildId || c.event.channel?.id || c.event.user?.id || 'dm';
+    const h = getHistory(historyKey);
     const info = [
       `messages: ${h.length}`,
-      `estimated: ${estHistoryTokens(channelId).toLocaleString()} tokens`,
-      `trigger:   ${shouldCompact(channelId)}`,
+      `estimated: ${estHistoryTokens(historyKey).toLocaleString()} tokens`,
+      `trigger:   ${shouldCompact(historyKey)}`,
     ];
     if (h.length < 4) {
       info.push('', 'Need at least 4 messages to compact.');
@@ -224,7 +223,7 @@ async function handleCompact(c) {
     if (!client) return await c.reply('Gemini not configured.');
     info.push('', 'Compacting...');
     await c.reply(`\`\`\`\nCompact info:\n${info.join('\n')}\n\`\`\``);
-    summarizeHistory(channelId, client);
+    summarizeHistory(historyKey, client);
     return;
   }
 
@@ -250,7 +249,8 @@ async function handleCompact(c) {
 }
 
 async function handleClear(c) {
-  clearHistory(c.event.channel?.id || c.event.user?.id);
+  const key = c.event.guild?.id || c.event.guildId || c.event.channel?.id || c.event.user?.id || 'dm';
+  clearHistory(key);
   await c.reply(t('cleared', {}, c));
 }
 
