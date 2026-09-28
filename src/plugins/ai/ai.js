@@ -168,6 +168,7 @@ const replyExec = async (c) => {
   const msg = c.event;
   const ref = msg.reference;
   if (!msg.author || !ref?.messageId) return;
+  if (msg.mentionEveryone) return;
   if (!geminiMessages.has(ref.messageId)) return;
 
   let query = msg.content || '';
