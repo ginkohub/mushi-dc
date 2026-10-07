@@ -501,8 +501,8 @@ async function playSong(guild) {
       ytError += d.toString();
     });
     ytproc.on('error', () => {});
-    ytproc.on('close', (code) => {
-      if (code !== 0 && state.current === song) {
+    ytproc.on('close', (code, signal) => {
+      if (code !== 0 && code !== null && !signal && state.current === song) {
         pen.Error('yt-dlp exited with code', code, ytError);
       }
     });
@@ -512,8 +512,8 @@ async function playSong(guild) {
       ffmpegErr += d.toString();
     });
     ffmpeg.on('error', () => {});
-    ffmpeg.on('close', (code) => {
-      if (code !== 0 && state.current === song) {
+    ffmpeg.on('close', (code, signal) => {
+      if (code !== 0 && code !== null && !signal && state.current === song) {
         pen.Error('ffmpeg exited with code', code, ffmpegErr);
       }
     });
@@ -532,7 +532,7 @@ async function playSong(guild) {
   } catch (err) {
     pen.Error('playSong', err);
     if (state.textChannel) {
-      state.textChannel.send(`Failed to play **${song.title}**: ${err.message}`).catch(() => {});
+      state.textChannel.send(`Failed to play **${song.title}**. Please try again later.`).catch(() => {});
     }
     state.currentIndex++;
     playSong(guild);
@@ -577,8 +577,8 @@ async function seekTo(guild, position) {
       ytError += d.toString();
     });
     ytproc.on('error', () => {});
-    ytproc.on('close', (code) => {
-      if (code !== 0 && state.current === song) {
+    ytproc.on('close', (code, signal) => {
+      if (code !== 0 && code !== null && !signal && state.current === song) {
         pen.Error('yt-dlp exited with code', code, ytError);
       }
     });
@@ -588,8 +588,8 @@ async function seekTo(guild, position) {
       ffmpegErr += d.toString();
     });
     ffmpeg.on('error', () => {});
-    ffmpeg.on('close', (code) => {
-      if (code !== 0 && state.current === song) {
+    ffmpeg.on('close', (code, signal) => {
+      if (code !== 0 && code !== null && !signal && state.current === song) {
         pen.Error('ffmpeg exited with code', code, ffmpegErr);
       }
     });

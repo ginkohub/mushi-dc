@@ -12,7 +12,7 @@
 
 import * as cheerio from 'cheerio';
 import { ApplicationIntegrationType, InteractionContextType, SlashCommandBuilder } from 'discord.js';
-import { Browser, Role } from '#mushi';
+import { Browser, pen, Role } from '#mushi';
 import { getState } from './_player.js';
 
 async function exec(c) {
@@ -71,7 +71,8 @@ async function exec(c) {
 
     await c.event.editReply(content);
   } catch (err) {
-    const msg = `Failed to fetch lyrics: ${err.message}`;
+    pen.Error('Lyrics', err);
+    const msg = 'Failed to fetch lyrics. Please try again later.';
     try {
       await c.event.editReply(msg);
     } catch {

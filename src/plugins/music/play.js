@@ -158,7 +158,10 @@ async function exec(c) {
     pen.Error('Music-Play', err);
     try {
       await c.event.editReply('❌');
-      await c.event.followUp({ content: `Error: ${err.message}`, flags: MessageFlags.Ephemeral });
+      await c.event.followUp({
+        content: 'Failed to process your request. Please try again later.',
+        flags: MessageFlags.Ephemeral,
+      });
     } catch {
       /* ignore */
     }
