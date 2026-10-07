@@ -8,6 +8,9 @@
  * This code is part of Ginko project (https://github.com/ginkohub)
  */
 
+import fs from 'node:fs';
+import path from 'node:path';
+
 export const LL_NONE = 0;
 export const LL_DEBUG = 1;
 export const LL_INFO = 2;
@@ -48,10 +51,16 @@ export function getTime(format) {
  * @returns {Pen} A new instance of the Pen class with the specified level.
  */
 export class Pen {
-  constructor({ level, format, prefix }) {
+  constructor({ level, format, prefix, file, retainDays }) {
     this.prefix = prefix;
     this.level = level;
     this.format = format ?? TIME_FORMAT;
+    /** @type {string | undefined} JSONL file prefix, e.g. 'logs/activity' -> 'logs/activity-YYYY-MM-DD.log' */
+    this.file = file;
+    /** @type {number} keep daily log files this many days */
+    this.retainDays = retainDays ?? 14;
+    /** @type {string | null} last day files were written, for rotation/prune */
+    this._day = null;
   }
 
   SetPrefix(prefix) {
@@ -167,6 +176,43 @@ export class Pen {
   }
 
   Log(...args) {
+    this.print(...args);
+    this.appendFile('log', args);
+  }
+
+  Debug(...args) {
+    if (this.level > LL_DEBUG || this.level === LL_NONE) {
+      return;
+    }
+    this.print(this.Magenta('[D]'), ...args);
+    this.appendFile('debug', args);
+  }
+
+  Info(...args) {
+    if (this.level > LL_INFO || this.level === LL_NONE) {
+      return;
+    }
+    this.print(this.Cyan('[I]'), ...args);
+    this.appendFile('info', args);
+  }
+
+  Warn(...args) {
+    if (this.level > LL_WARN || this.level === LL_NONE) {
+      return;
+    }
+    this.print(this.Yellow('[W]'), ...args);
+    this.appendFile('warn', args);
+  }
+
+  Error(...args) {
+    if (this.level > LL_ERROR || this.level === LL_NONE) {
+      return;
+    }
+    this.print(this.Red('[E]'), ...args);
+    this.appendFile('error', args);
+  }
+
+  print(...args) {
     if (this.prefix) {
       console.log(getTime(this.format), this.prefix, ...args);
     } else {
@@ -174,32 +220,70 @@ export class Pen {
     }
   }
 
-  Debug(...args) {
-    if (this.level > LL_DEBUG || this.level === LL_NONE) {
-      return;
-    }
-    this.Log(this.Magenta('[D]'), ...args);
+  /** Redact secrets so they never land in log files. */
+  redact(s) {
+    let out = String(s ?? '');
+    const token = process.env.DISCORD_TOKEN;
+    if (token && token.length > 8) out = out.split(token).join('[REDACTED]');
+    return out;
   }
 
-  Info(...args) {
-    if (this.level > LL_INFO || this.level === LL_NONE) {
-      return;
+  /** Resolve today's log file, creating dirs and pruning old files on day rollover. */
+  rotate() {
+    const now = new Date();
+    const stamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    fs.mkdirSync(path.dirname(this.file), { recursive: true });
+    if (stamp !== this._day) {
+      this._day = stamp;
+      this.prune(stamp);
     }
-    this.Log(this.Cyan('[I]'), ...args);
+    return `${this.file}-${stamp}.log`;
   }
 
-  Warn(...args) {
-    if (this.level > LL_WARN || this.level === LL_NONE) {
-      return;
+  /** Delete daily log files older than retainDays. */
+  prune(stamp) {
+    if (!(this.retainDays > 0)) return;
+    try {
+      const dir = path.dirname(this.file);
+      const base = path.basename(this.file);
+      const cutoff = Date.parse(`${stamp}T00:00:00`) - this.retainDays * 86_400_000;
+      for (const f of fs.readdirSync(dir)) {
+        if (!f.startsWith(`${base}-`) || !f.endsWith('.log')) continue;
+        const day = f.slice(base.length + 1, -4);
+        if (/^\d{4}-\d{2}-\d{2}$/.test(day) && Date.parse(`${day}T00:00:00`) < cutoff) {
+          fs.unlinkSync(path.join(dir, f));
+        }
+      }
+    } catch {
+      /* best effort */
     }
-    this.Log(this.Yellow('[W]'), ...args);
   }
 
-  Error(...args) {
-    if (this.level > LL_ERROR || this.level === LL_NONE) {
-      return;
+  /** Append a console-style line as JSON to the daily log file. */
+  appendFile(level, args) {
+    if (!this.file) return;
+    try {
+      const line = JSON.stringify({
+        ts: new Date().toISOString(),
+        level,
+        prefix: this.prefix ?? null,
+        msg: this.redact(this.asString(...args)),
+      });
+      fs.appendFileSync(this.rotate(), `${line}\n`);
+    } catch {
+      /* logging must never crash the bot */
     }
-    this.Log(this.Red('[E]'), ...args);
+  }
+
+  /** Append a structured object as JSON to the daily log file (no console output). */
+  record(obj) {
+    if (!this.file) return;
+    try {
+      const line = JSON.stringify({ ts: new Date().toISOString(), ...obj });
+      fs.appendFileSync(this.rotate(), `${this.redact(line)}\n`);
+    } catch {
+      /* logging must never crash the bot */
+    }
   }
 }
 

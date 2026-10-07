@@ -8,11 +8,10 @@
  * This code is part of Ginko project (https://github.com/ginkohub)
  */
 
-import { pen, Role, RoleMoji } from '#mushi';
+import { pen, RoleMoji, sanitizeArgs } from '#mushi';
 
 /** @type {import('#mushi/plugin.js').Plugin } */
 export default {
-  roles: [Role.USER],
   exec: async (c) => {
     const m = c.event;
 
@@ -26,11 +25,15 @@ export default {
         logs.push('>', reply.author.username);
       }
 
-      if (c.text) {
-        logs.push(':', c.text);
+      if (c.isSlash) {
+        if (c.text) logs.push(':', c.text);
+        const args = sanitizeArgs(c.argv);
+        if (args && Object.keys(args).length > 0) logs.push(JSON.stringify(args));
+        pen.Log(...logs);
+      } else {
+        pen.Log(...logs);
+        if (c.text) pen.Debug(c.sender, ':', c.text);
       }
-
-      pen.Log(...logs);
     } catch (e) {
       pen.Error(e);
     }

@@ -21,6 +21,16 @@ import { read, write } from './store.js';
 import { delay, hashCRC32, shouldUsePolling } from './tools.js';
 import { UserManager } from './user_manager.js';
 
+/** Redact option values whose names look like secrets (cookies, tokens, ...). */
+export function sanitizeArgs(argv) {
+  if (!argv || typeof argv !== 'object') return argv ?? null;
+  const out = {};
+  for (const [k, v] of Object.entries(argv)) {
+    out[k] = /cookie|token|secret|password|key/i.test(k) ? '[REDACTED]' : v;
+  }
+  return out;
+}
+
 /**
  * @typedef {Object} HandlerOptions
  * @property {string} pluginDir
@@ -54,6 +64,9 @@ export class Handler {
 
     /** @type {import('./pen.js').Pen)} */
     this.pen = pen ?? new Pen({ prefix: 'hand' });
+
+    /** @type {import('./pen.js').Pen} file-only activity log (logs/activity-YYYY-MM-DD.log) */
+    this.activity = new Pen({ prefix: 'act', file: 'logs/activity', retainDays: 14 });
 
     /** @type {Map<number, import('./plugin.js').Plugin>} */
     this.plugins = new Map();
@@ -470,6 +483,12 @@ export class Handler {
         return;
       }
 
+      const t0 = Date.now();
+      const meta = () => ({
+        guildId: event?.guildId ?? event?.guild?.id ?? null,
+        channelId: event?.channelId ?? event?.channel?.id ?? null,
+        userId: event?.user?.id ?? event?.author?.id ?? null,
+      });
       const ctx = new Ctx({
         handler: this,
         eventName: eventName,
@@ -525,6 +544,7 @@ export class Handler {
         if (pid) {
           const plugin = this.plugins.get(pid);
           if (plugin) {
+            const act = { type: 'slash', cmd: ctx.cmd, args: sanitizeArgs(ctx.argv), ...meta() };
             try {
               /** @type {import('./plugin.js').Plugin} */
               ctx.plugin = () => plugin;
@@ -538,13 +558,16 @@ export class Handler {
                   /* ignore */
                 }
                 if (plugin?.final) await plugin.final(ctx, reason);
+                this.activity.record({ ...act, ok: false, code: reason?.code, latencyMs: Date.now() - t0 });
                 return;
               }
 
               /* Exec */
               if (plugin?.exec) await plugin?.exec(ctx);
+              this.activity.record({ ...act, ok: true, latencyMs: Date.now() - t0 });
             } catch (e) {
               this.pen.Error('handle-command', ctx.pattern, e);
+              this.activity.record({ ...act, ok: false, code: 'handle-command-error', latencyMs: Date.now() - t0 });
               if (plugin?.final) {
                 await plugin?.final(
                   ctx,
@@ -561,6 +584,18 @@ export class Handler {
             }
           }
         }
+      }
+
+      /* Plain message / other interaction: metadata only, no content */
+      if (!ctx.isSlash) {
+        this.activity.record({
+          type: 'message',
+          eventType,
+          messageId: event?.id ?? null,
+          ...meta(),
+          ok: true,
+          latencyMs: Date.now() - t0,
+        });
       }
     } catch (e) {
       this.pen.Error('handle', e);
