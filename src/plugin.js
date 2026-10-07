@@ -55,7 +55,22 @@ export const RoleMoji = Object.freeze({
  */
 export class Plugin {
   /** @param {Plugin} */
-  constructor({ data, cmd, desc, cat, tags, disabled, hidden, roles, timeout, midware, exec, final, location }) {
+  constructor({
+    data,
+    cmd,
+    noPrefix,
+    desc,
+    cat,
+    tags,
+    disabled,
+    hidden,
+    roles,
+    timeout,
+    midware,
+    exec,
+    final,
+    location,
+  }) {
     /** @type {import('./handler.js').Handler} */
     this.handler = null;
 
@@ -67,6 +82,9 @@ export class Plugin {
 
     /** @type {string | string[]}*/
     this.cmd = cmd;
+
+    /** @type {boolean} match bare cmd without prefix */
+    this.noPrefix = noPrefix ?? false;
 
     /** @type {string} */
     this.desc = desc;

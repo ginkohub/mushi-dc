@@ -89,10 +89,31 @@ export class Ctx {
      */
     this.parseText = (text) => {
       this.text = text;
+      this.pattern = '';
+      this.prefix = '';
+      this.cmd = '';
+      this.args = '';
+      this.isPrefixCmd = false;
 
       if (text && text.length > 0) {
         const splitted = text.split(' ');
+        /** @type {string} first word, may be prefix+cmd (ala mushi WA) */
+        this.pattern = splitted[0] ?? '';
+
+        const prefixes = handler?.getPrefixes?.() ?? [];
+        this.prefix = prefixes.find((p) => this.pattern.toLowerCase().startsWith(String(p).toLowerCase())) || '';
+
+        /** @type {string} cmd without prefix */
+        const rawCmd = this.prefix ? this.pattern.slice(this.prefix.length) : this.pattern;
+        this.cmd = rawCmd;
         this.args = splitted.slice(1)?.join(' ');
+
+        /** @type {boolean} true when pattern matches a registered prefix command */
+        this.isPrefixCmd = handler?.isPrefixCmd?.(this.pattern) ?? false;
+        if (this.isPrefixCmd) {
+          const resolved = handler?.getPrefixCmd?.(this.pattern);
+          if (resolved) this.cmd = resolved.cmd;
+        }
       }
     };
 
@@ -135,7 +156,7 @@ export class Ctx {
     this.fromMe = event?.author?.id === this.client()?.user?.id;
 
     /** @type {boolean} */
-    this.isEdited = oldEvent !== null || oldEvent !== undefined;
+    this.isEdited = oldEvent != null;
 
     /** @type {string} */
     this.quotedId = event?.reference?.messageId;

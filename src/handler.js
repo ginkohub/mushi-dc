@@ -47,7 +47,7 @@ export class Handler {
   /**
    * @param {HandlerOptions}
    */
-  constructor({ pluginDir, useSlash, filter, pen }) {
+  constructor({ pluginDir, useSlash, filter, pen, prefixes }) {
     /** @type {number} */
     this.startAt = Date.now();
 
@@ -58,6 +58,9 @@ export class Handler {
 
     /** @type {boolean} */
     this.useSlash = useSlash ?? true;
+
+    /** @type {string[]} command prefixes, e.g. ['!'] (persisted in data.json) */
+    this.prefixes = prefixes?.length > 0 ? prefixes : (read().prefixes ?? ['!']);
 
     /** @type {import('discord.js').Client} */
     this.client = null;
@@ -76,6 +79,9 @@ export class Handler {
 
     /* Slash command */
     this.slashs = new Map();
+
+    /* Prefix commands: pattern (prefix+cmd, lowercase) -> plugin id */
+    this.prefixCmds = new Map();
 
     /** @type {Map<string, Function>} */
     this.autoc = new Map();
@@ -256,8 +262,14 @@ export class Handler {
       const newid = `${hash}-${i}`;
       this.plugins.set(newid, plugin);
 
-      /* Check if plugin has data, so it is a slash command */
-      if (plugin.data) {
+      /* Prefix command (e.g. cmd:'ai' + prefixes:['!'] -> '!ai'). Dispatched
+         centrally, so it is NOT also added as a listener. */
+      if (opt.cmd) {
+        for (const [pattern, id] of this.generatePrefixCmd(newid, opt.cmd, opt.noPrefix)) {
+          this.prefixCmds.set(pattern, id);
+        }
+      } else if (plugin.data) {
+        /* Check if plugin has data, so it is a slash command */
         this.slashs.set(plugin.data.name, newid);
         if (opt.autocomplete) this.autoc.set(plugin.data.name, opt.autocomplete);
       } else {
@@ -266,6 +278,66 @@ export class Handler {
 
       i++;
     }
+  }
+
+  /**
+   * Generate prefix+cmd patterns for a plugin (ala mushi WA generateCMD).
+   * @param {string} id plugin id
+   * @param {string | string[]} cmds
+   * @param {boolean} noPrefix match bare cmd without prefix
+   * @returns {Array<[string, string]>} [pattern, id] pairs, pattern lowercase
+   */
+  generatePrefixCmd(id, cmds, noPrefix) {
+    const list = Array.isArray(cmds) ? cmds : [cmds];
+    const out = [];
+    for (let cmd of list) {
+      cmd = String(cmd).toLowerCase();
+      if (noPrefix) {
+        out.push([cmd, id]);
+      } else {
+        for (const prefix of this.prefixes) {
+          out.push([`${prefix}${cmd}`.toLowerCase(), id]);
+        }
+      }
+    }
+    return out;
+  }
+
+  /** Check if given pattern is a registered prefix command. */
+  isPrefixCmd(pattern) {
+    return !!pattern && this.prefixCmds.has(String(pattern).toLowerCase());
+  }
+
+  /** Resolve pattern to its prefix command plugin. */
+  getPrefixCmd(pattern) {
+    if (!pattern) return null;
+    const id = this.prefixCmds.get(String(pattern).toLowerCase());
+    if (!id) return null;
+    return this.plugins.get(id) ?? null;
+  }
+
+  /**
+   * Persisted prefixes (data.json `prefixes`), default ['!'].
+   * @param {string | string[]} list
+   */
+  setPrefixes(list) {
+    this.prefixes = Array.isArray(list) ? list : [list];
+    const data = read();
+    data.prefixes = this.prefixes;
+    write(data);
+    // Rebuild patterns for already loaded prefix commands.
+    this.prefixCmds.clear();
+    for (const [id, plugin] of this.plugins) {
+      if (plugin.cmd) {
+        for (const [pattern, pid] of this.generatePrefixCmd(id, plugin.cmd, plugin.noPrefix)) {
+          this.prefixCmds.set(pattern, pid);
+        }
+      }
+    }
+  }
+
+  getPrefixes() {
+    return this.prefixes;
   }
 
   /**
@@ -282,6 +354,9 @@ export class Handler {
           }
           for (const [id_sls, val] of this.slashs) {
             if (val === id_sls) this.slashs.delete(id_sls);
+          }
+          for (const [pattern, val] of this.prefixCmds) {
+            if (val === id) this.prefixCmds.delete(pattern);
           }
         }
       }
@@ -582,6 +657,51 @@ export class Handler {
             } finally {
               ctx.plugin = null;
             }
+          }
+        }
+      }
+
+      /* Handle prefix command */
+      if (!ctx.isSlash && ctx.isPrefixCmd && this.isSafe(ctx)) {
+        const plugin = this.getPrefixCmd(ctx.pattern);
+        if (plugin) {
+          const act = { type: 'prefix', cmd: ctx.cmd, prefix: ctx.prefix, args: sanitizeArgs(ctx.argv), ...meta() };
+          try {
+            /** @type {import('./plugin.js').Plugin} */
+            ctx.plugin = () => plugin;
+
+            /* Check rules and midware before exec */
+            const reason = await plugin?.check(ctx);
+            if (!reason?.success) {
+              try {
+                await ctx.reply({ content: reason.message, flags: MessageFlags.Ephemeral });
+              } catch {
+                /* ignore */
+              }
+              if (plugin?.final) await plugin.final(ctx, reason);
+              this.activity.record({ ...act, ok: false, code: reason?.code, latencyMs: Date.now() - t0 });
+              return;
+            }
+
+            /* Exec */
+            if (plugin?.exec) await plugin?.exec(ctx);
+            this.activity.record({ ...act, ok: true, latencyMs: Date.now() - t0 });
+          } catch (e) {
+            this.pen.Error('handle-prefix', ctx.pattern, e);
+            this.activity.record({ ...act, ok: false, code: 'handle-prefix-error', latencyMs: Date.now() - t0 });
+            if (plugin?.final) {
+              await plugin?.final(
+                ctx,
+                new Reason({
+                  success: false,
+                  code: 'handle-prefix-error',
+                  author: import.meta.url,
+                  message: e.message,
+                }),
+              );
+            }
+          } finally {
+            ctx.plugin = null;
           }
         }
       }

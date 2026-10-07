@@ -25,12 +25,14 @@ import {
 const t = translate({
   en: {
     usage: 'Usage: `/ai chat <message>`',
+    prefix_usage: 'Usage: `!ai <message>`',
     no_cookies: 'Gemini cookies not set.\nUse `/aiset cookies text:__Secure-1PSID=xxx __Secure-1PSIDTS=yyy` first.',
     error: 'Error: {msg}',
     unexpected: 'Unexpected error: {msg}',
   },
   id: {
     usage: 'Gunakan: `/ai chat <pesan>`',
+    prefix_usage: 'Gunakan: `!ai <pesan>`',
     no_cookies:
       'Cookie Gemini belum diatur.\nGunakan `/aiset cookies text:__Secure-1PSID=xxx __Secure-1PSIDTS=yyy` terlebih dahulu.',
     error: 'Kesalahan: {msg}',
@@ -168,11 +170,51 @@ const chatExec = async (c) => {
   }
 };
 
+const prefixExec = async (c) => {
+  if (c.isSlash || c.isEdited) return;
+  const msg = c.event;
+  if (!msg?.author || msg.author.bot) return;
+  const query = (c.args || '').trim();
+  if (!query) {
+    await msg.reply(t('prefix_usage', {}, c)).catch(() => {});
+    return;
+  }
+
+  const historyKey = getHistoryKey(msg);
+  await msg.channel?.sendTyping?.().catch(() => {});
+  try {
+    const info = {
+      user: { name: msg.author?.globalName, username: msg.author?.username },
+      channel: msg.channel?.name || null,
+      server: msg.guild?.name || null,
+      bot: c.client()?.user?.username || null,
+    };
+    const res = await askGemini(historyKey, query, info);
+    if (!res.status) {
+      pen.Error('AI', res.error);
+      if (res.error === 'no_cookies') {
+        await msg.reply(t('no_cookies', {}, c)).catch(() => {});
+        return;
+      }
+      await msg.react('❌').catch(() => {});
+      return;
+    }
+    const userName = msg.author?.globalName || msg.author?.username || 'User';
+    const botName = c.client()?.user?.username || 'Gemini';
+    const sent = await sendChunks(res.text, (text) => msg.reply(text));
+    remember(historyKey, query, res.text, msg.id, sent?.id, userName, botName);
+  } catch (e) {
+    pen.Error('AI', e);
+    await msg.react('❌').catch(() => {});
+  }
+};
+
 const replyExec = async (c) => {
   const msg = c.event;
   const ref = msg.reference;
   if (!msg.author || !ref?.messageId) return;
   if (msg.mentionEveryone) return;
+  if (c.isPrefixCmd) return;
   if (!geminiMessages.has(ref.messageId)) return;
 
   let query = msg.content || '';
@@ -222,6 +264,11 @@ export default [
   {
     roles: [Role.GUEST],
     exec: replyExec,
+  },
+  {
+    roles: [Role.GUEST],
+    cmd: 'ai',
+    exec: prefixExec,
   },
   {
     roles: [Role.GUEST],
