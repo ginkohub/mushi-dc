@@ -89,6 +89,43 @@ function saveGuildPlaylists(guildId, playlists) {
   write(data);
 }
 
+/** Stay preferences: { stay: { [guildId]: { channelId } } } — persists across restarts. */
+export function getStay(guildId) {
+  return read().stay?.[guildId] ?? null;
+}
+
+export function setStay(guildId, channelId) {
+  const data = read();
+  if (!data.stay) data.stay = {};
+  if (channelId) {
+    data.stay[guildId] = { channelId };
+  } else {
+    delete data.stay[guildId];
+  }
+  write(data);
+  const state = states.get(guildId);
+  if (state) state.stayChannelId = channelId ?? null;
+  return channelId ? data.stay[guildId] : null;
+}
+
+/** Arm auto-leave in 60s, unless stay is on for this guild. */
+function scheduleAutoLeave(guildId) {
+  const state = getState(guildId);
+  if (state.nextDc) {
+    clearTimeout(state.nextDc);
+    state.nextDc = null;
+  }
+  if (!state.connection) return;
+  if (getStay(guildId) || state.stayChannelId) return;
+  state.nextDc = setTimeout(() => {
+    if (state.currentIndex === -1 && !getStay(guildId) && !state.stayChannelId) {
+      const tc = state.textChannel;
+      cleanup(guildId);
+      if (tc) tc.send('Queue ended, leaving voice channel.').catch(() => {});
+    }
+  }, 60_000);
+}
+
 function loopLabel(mode) {
   return ['Off', 'Single', 'All'][mode] ?? 'Off';
 }
@@ -239,6 +276,7 @@ class GuildState {
     this.textChannel = null;
     this.volume = 1;
     this.loopMode = 0;
+    this.stayChannelId = null;
     this.startedAt = null;
     this.pausedAt = null;
     this.pausedTotal = 0;
@@ -275,6 +313,9 @@ function getState(guildId) {
     if (data.guildVolume?.[guildId] != null) {
       state.volume = data.guildVolume[guildId];
     }
+    if (data.stay?.[guildId]?.channelId) {
+      state.stayChannelId = data.stay[guildId].channelId;
+    }
 
     state.player.on(AudioPlayerStatus.Idle, () => {
       stopProgressTimer(state);
@@ -296,15 +337,7 @@ function getState(guildId) {
         } else {
           state.currentIndex = -1;
           removePlayerUI(state);
-          if (state.connection) {
-            state.nextDc = setTimeout(() => {
-              if (state.currentIndex === -1) {
-                const tc = state.textChannel;
-                cleanup(guildId);
-                if (tc) tc.send('Queue ended, leaving voice channel.').catch(() => {});
-              }
-            }, 60_000);
-          }
+          scheduleAutoLeave(guildId);
         }
         return;
       }
@@ -326,15 +359,7 @@ function getState(guildId) {
       } else {
         state.currentIndex = -1;
         removePlayerUI(state);
-        if (state.connection) {
-          state.nextDc = setTimeout(() => {
-            if (state.currentIndex === -1) {
-              const tc = state.textChannel;
-              cleanup(guildId);
-              if (tc) tc.send('Queue ended, leaving voice channel.').catch(() => {});
-            }
-          }, 60_000);
-        }
+        scheduleAutoLeave(guildId);
       }
     });
 
@@ -362,6 +387,8 @@ async function connect(guild, voiceChannel) {
   if (state.connection) {
     const oldChannelId = state.connection.joinConfig.channelId;
     if (oldChannelId === voiceChannel.id) return state.connection;
+    // Stay follows the bot: moved by /play from another channel.
+    if (getStay(guild.id) || state.stayChannelId) setStay(guild.id, voiceChannel.id);
     state.connection.destroy();
     state.connection = null;
   }
@@ -383,7 +410,20 @@ async function connect(guild, voiceChannel) {
     try {
       await entersState(connection, VoiceConnectionStatus.Connecting, 5_000);
     } catch {
+      const stay = getStay(guild.id) ?? (state.stayChannelId ? { channelId: state.stayChannelId } : null);
       cleanup(guild.id);
+      // Stay mode: attempt one rejoin; give up quietly if the channel is gone.
+      if (stay?.channelId && guilds.get(guild.id)) {
+        try {
+          const ch = await guild.channels.fetch(stay.channelId).catch(() => null);
+          if (ch?.isVoiceBased?.()) {
+            const g = guilds.get(guild.id);
+            if (g) await connect(g, ch).catch(() => {});
+          }
+        } catch {
+          /* stay rejoin failed, remain disconnected */
+        }
+      }
     }
   });
 
@@ -719,6 +759,7 @@ function setVolume(guildId, vol) {
 }
 
 function stop(guildId) {
+  setStay(guildId, null);
   disconnect(guildId);
 }
 

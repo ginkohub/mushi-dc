@@ -634,6 +634,32 @@ export class Handler {
   }
 
   /**
+   * Rejoin stay voice channels saved in data.json (after bot restart).
+   */
+  async restoreStay() {
+    const stay = read().stay ?? {};
+    const guildIds = Object.keys(stay);
+    if (guildIds.length === 0) return;
+    const { connect, getState } = await import('./plugins/music/_player.js');
+    let rejoined = 0;
+    for (const guildId of guildIds) {
+      try {
+        const guild = this.client.guilds.cache.get(guildId);
+        const channelId = stay[guildId]?.channelId;
+        if (!guild || !channelId) continue;
+        const ch = await guild.channels.fetch(channelId).catch(() => null);
+        if (!ch?.isVoiceBased?.()) continue;
+        getState(guildId);
+        await connect(guild, ch);
+        rejoined++;
+      } catch (e) {
+        this.pen.Error('restore-stay', guildId, e?.message ?? e);
+      }
+    }
+    if (rejoined > 0) this.pen.Info(`Stay restored in ${rejoined} voice channel(s)`);
+  }
+
+  /**
    * Handle when client ready
    *
    * @param {import()} e
@@ -643,6 +669,7 @@ export class Handler {
     this.pen.Info(
       `${this.slashs.size} Slashs (${this.useSlash ? 'enabled' : 'disabled'}), ${this.listens.size} Listeners of ${this.plugins.size} Plugins`,
     );
+    this.restoreStay().catch((err) => this.pen.Error('restore-stay', err?.message ?? err));
     await delay(1000);
 
     if (this.useSlash) {
