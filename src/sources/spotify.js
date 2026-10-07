@@ -85,7 +85,8 @@ async function toTrack(sp) {
   const y = yt[0];
   return {
     url: y.url,
-    title: artists ? `${artists} - ${sp.name}` : sp.name,
+    title: sp.name,
+    artist: artists || y.artist || null,
     duration: y.duration || Math.round((sp.duration_ms ?? 0) / 1000),
     thumbnail: coverOf(sp, y.thumbnail),
     source: 'spotify',

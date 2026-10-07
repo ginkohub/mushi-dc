@@ -13,6 +13,22 @@ import { getYT } from '../ytdlp.js';
 
 getYT().catch(() => {});
 
+function pickThumbnail(e) {
+  if (e?.thumbnail) return e.thumbnail;
+  const arr = Array.isArray(e?.thumbnails) ? e.thumbnails.filter((t) => t?.url) : [];
+  if (!arr.length) return null;
+  let best = arr[0];
+  let bestArea = (best.width || 0) * (best.height || 0);
+  for (const t of arr) {
+    const area = (t.width || 0) * (t.height || 0);
+    if (area > bestArea) {
+      best = t;
+      bestArea = area;
+    }
+  }
+  return best.url;
+}
+
 function toTrack(e, confidence = 1) {
   if (!e) return null;
   const url = e.url || (e.id ? `https://youtube.com/watch?v=${e.id}` : null);
@@ -20,8 +36,9 @@ function toTrack(e, confidence = 1) {
   return {
     url,
     title: e.title || 'Unknown',
+    artist: e.artist || e.creator || e.uploader || e.channel || null,
     duration: e.duration || 0,
-    thumbnail: e.thumbnail || null,
+    thumbnail: pickThumbnail(e),
     source: 'youtube',
     confidence,
   };
@@ -39,8 +56,9 @@ export const youtubeSource = {
     return {
       url,
       title: info.title || 'Unknown',
+      artist: info.artist || info.creator || info.uploader || info.channel || null,
       duration: info.duration || 0,
-      thumbnail: info.thumbnail || null,
+      thumbnail: pickThumbnail(info),
       source: 'youtube',
       confidence: 1,
     };

@@ -89,36 +89,49 @@ function saveGuildPlaylists(guildId, playlists) {
   write(data);
 }
 
+function loopLabel(mode) {
+  return ['Off', 'Single', 'All'][mode] ?? 'Off';
+}
+
+function nowPlayingEmbed(state) {
+  const s = state.current;
+  if (!s) return null;
+
+  const title = s.url ? `[**${s.title}**](${s.url})` : `**${s.title}**`;
+  const lines = [title];
+
+  const bar = progressBar(state);
+  if (bar) lines.push(bar);
+  if (s.artist) lines.push(`-# 🎤 ${s.artist}`);
+  if (s.requester) lines.push(`-# 👤 Requested by <@${s.requester}>`);
+  lines.push(
+    `-# 🎶 ${state.songs.length} song(s) in queue • 🔊 Volume: ${Math.round(state.volume * 100)}% • 🔁 Loop: ${loopLabel(state.loopMode)}${s.source ? ` • via ${sourceLabel(s.source)}` : ''}`,
+  );
+
+  const upNext = state.songs;
+  if (upNext.length > 0) {
+    lines.push('', `**Up next (${upNext.length}):**`);
+    for (const t of upNext.slice(0, 5)) {
+      lines.push(`\`${state.tracks.indexOf(t) + 1}.\` ${t.title}`);
+    }
+    if (upNext.length > 5) lines.push(`*+${upNext.length - 5} more*`);
+  }
+
+  return {
+    color: 0x00ff00,
+    author: { name: '🎵 Now Playing' },
+    description: lines.join('\n'),
+    thumbnail: s.thumbnail ? { url: s.thumbnail } : undefined,
+  };
+}
+
 function playerUI(state) {
   const s = state.current;
   if (!s) return null;
 
   const paused = state.player.state.status === 'paused';
 
-  const loopEmoji = state.loopMode === 1 ? '🔂' : state.loopMode === 2 ? '🔁' : '';
-  const loopStr = loopEmoji ? `${loopEmoji} ` : '';
-
-  const bar = progressBar(state);
-  let desc = `${bar}\n${loopStr}Volume: ${Math.round(state.volume * 100)}% | Requested by: <@${s.requester}>${s.source ? ` | via ${sourceLabel(s.source)}` : ''}`;
-
-  const upNext = state.songs;
-  if (upNext.length > 0) {
-    const next = upNext.slice(0, 5);
-    const total = upNext.length;
-    desc += `\n\n**Up next (${total}):**`;
-    for (let i = 0; i < next.length; i++) {
-      desc += `\n\`${state.currentIndex + 2 + i}.\` ${next[i].title}`;
-    }
-    if (total > 5) desc += `\n*+${total - 5} more*`;
-  }
-
-  const embed = {
-    color: 0x00ff00,
-    title: s.title,
-    url: s.url,
-    description: desc,
-    thumbnail: s.thumbnail ? { url: s.thumbnail } : undefined,
-  };
+  const embed = nowPlayingEmbed(state);
 
   const row1 = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('mp_prev').setEmoji('⏮️').setStyle(ButtonStyle.Secondary),
@@ -723,6 +736,7 @@ export {
   guilds,
   isDuplicateTrack,
   moveInQueue,
+  nowPlayingEmbed,
   playSong,
   previousTrack,
   removeFromQueue,

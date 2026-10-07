@@ -22,7 +22,7 @@
  * }
  *
  * Track contract:
- * { url, title, duration, thumbnail, source, confidence, requester? }
+ * { url, title, artist, duration, thumbnail, source, confidence, requester? }
  */
 
 import { spotifySource } from './sources/spotify.js';
