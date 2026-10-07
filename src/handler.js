@@ -746,6 +746,15 @@ export class Handler {
       async (o, m) => await this.handle({ eventType: Events.MessageUpdate, event: m, oldEvent: o }),
     );
     this.client.on(Events.MessageCreate, async (m) => await this.handle({ eventType: Events.MessageCreate, event: m }));
+    this.client.on(Events.ChannelDelete, async (ch) => {
+      try {
+        if (!ch?.isVoiceBased?.()) return;
+        const { handleVoiceChannelDelete } = await import('./plugins/music/_player.js');
+        handleVoiceChannelDelete(ch.guild?.id ?? ch.guildId, ch.id);
+      } catch (e) {
+        this.pen.Error('channel-delete', e?.message ?? e);
+      }
+    });
     if (this.useSlash)
       this.client.on(
         Events.InteractionCreate,

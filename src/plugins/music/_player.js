@@ -471,6 +471,26 @@ function cleanup(guildId) {
   state.textChannel = null;
 }
 
+/**
+ * Called when a voice channel is deleted (e.g. temp-channel bots that
+ * remove empty channels while mushi is staying/playing in them).
+ * Releases the dead connection, stops playback, and drops the stay
+ * preference pointing at the now-gone channel.
+ * @returns {boolean} true when this guild was affected
+ */
+export function handleVoiceChannelDelete(guildId, channelId) {
+  const state = states.get(guildId);
+  if (!state) return false;
+  const connId = state.connection?.joinConfig?.channelId ?? null;
+  const stay = getStay(guildId) ?? (state.stayChannelId ? { channelId: state.stayChannelId } : null);
+  if (connId !== channelId && stay?.channelId !== channelId) return false;
+  const tc = state.textChannel;
+  if (stay?.channelId === channelId) setStay(guildId, null);
+  cleanup(guildId);
+  if (tc) tc.send('Voice channel was deleted, stopped playback.').catch(() => {});
+  return true;
+}
+
 async function playSong(guild) {
   const state = getState(guild.id);
 
