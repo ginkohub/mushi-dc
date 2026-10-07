@@ -14,6 +14,7 @@ export * from './handler.js';
 export * from './pen.js';
 export * from './plugin.js';
 export * from './reason.js';
+export * from './sources.js';
 export * from './store.js';
 export * from './tools.js';
 export * from './translate.js';

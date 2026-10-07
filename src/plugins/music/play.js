@@ -12,7 +12,7 @@
 
 import { AudioPlayerStatus } from '@discordjs/voice';
 import { ApplicationIntegrationType, InteractionContextType, MessageFlags, SlashCommandBuilder } from 'discord.js';
-import { Browser, pen, Role } from '#mushi';
+import { Browser, matchSource, pen, Role, resolvePlaylist } from '#mushi';
 import {
   connect,
   formatDuration,
@@ -43,7 +43,6 @@ async function exec(c) {
   await c.event.deferReply();
 
   try {
-    const yt = await getYT();
     const state = getState(guild.id);
 
     if (!state.textChannel) state.textChannel = c.event.channel;
@@ -61,12 +60,18 @@ async function exec(c) {
     }
 
     const isUrl = /^https?:\/\//.test(query);
+    const matched = isUrl ? matchSource(query) : null;
     const isPlaylist =
       /youtube\.com\/playlist\?list=/.test(query) ||
-      /(?:youtube\.com|youtu\.be)\/.*[?&]list=([a-zA-Z0-9_-]+)/.test(query);
+      /(?:youtube\.com|youtu\.be)\/.*[?&]list=([a-zA-Z0-9_-]+)/.test(query) ||
+      (matched?.id === 'spotify' && /\/(playlist|album)\//.test(query));
 
     if (isUrl && isPlaylist) {
-      const entries = await yt.getPlaylistInfo(query);
+      const entries = await resolvePlaylist(query);
+      if (!entries.length) {
+        await c.event.editReply('No results found.');
+        return;
+      }
       const limit = 50;
       const items = entries.slice(0, limit);
       const existingKeys = new Set([
@@ -76,10 +81,11 @@ async function exec(c) {
       const newTracks = [];
       for (const e of items) {
         const track = {
-          url: `https://youtube.com/watch?v=${e.id}`,
+          url: e.url,
           title: e.title || 'Unknown',
           duration: e.duration || 0,
           thumbnail: e.thumbnail || null,
+          source: e.source,
           requester: c.senderId,
         };
         const key = getTrackKey(track);

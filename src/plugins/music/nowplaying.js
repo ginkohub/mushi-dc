@@ -9,7 +9,7 @@
  */
 
 import { ApplicationIntegrationType, InteractionContextType, SlashCommandBuilder } from 'discord.js';
-import { Role } from '#mushi';
+import { Role, sourceLabel } from '#mushi';
 import { formatDuration, getState } from './_player.js';
 
 async function exec(c) {
@@ -25,7 +25,7 @@ async function exec(c) {
     color: 0x00ff00,
     title: s.title,
     url: s.url,
-    description: `Duration: ${formatDuration(s.duration)} | Requested by: <@${s.requester}>`,
+    description: `Duration: ${formatDuration(s.duration)} | Requested by: <@${s.requester}>${s.source ? ` | via ${sourceLabel(s.source)}` : ''}`,
     thumbnail: s.thumbnail ? { url: s.thumbnail } : undefined,
   };
 

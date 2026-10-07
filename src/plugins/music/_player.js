@@ -24,8 +24,11 @@ import {
   VoiceConnectionStatus,
 } from '@discordjs/voice';
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
-import { getYT, read, write } from '#mushi';
+import { getYT, read, sourceLabel, write } from '#mushi';
 import pen from '#mushi/pen.js';
+import { spawnStream } from '#mushi/sources.js';
+
+export { resolveSong } from '#mushi/sources.js';
 
 let ffmpegPath = 'ffmpeg';
 try {
@@ -33,29 +36,6 @@ try {
 } catch {}
 
 getYT().catch(() => {});
-
-async function resolveSong(query) {
-  const yt = await getYT();
-  const isUrl = /^https?:\/\//.test(query);
-  if (isUrl) {
-    const info = await yt.getVideoInfo(query);
-    return {
-      url: query,
-      title: info.title || 'Unknown',
-      duration: info.duration || 0,
-      thumbnail: info.thumbnail || null,
-    };
-  }
-  const results = await yt.search(query, 1);
-  if (!results?.length) return null;
-  const r = results[0];
-  return {
-    url: r.url || `https://youtube.com/watch?v=${r.id}`,
-    title: r.title || 'Unknown',
-    duration: r.duration || 0,
-    thumbnail: r.thumbnail || null,
-  };
-}
 
 function getTrackKey(track) {
   if (!track) return '';
@@ -122,7 +102,7 @@ function playerUI(state) {
   const plHeader = state.activePlaylist
     ? `Playlist: **${state.activePlaylist}** (${state.currentIndex + 1}/${state.tracks.length})\n`
     : '';
-  let desc = `${plHeader}${bar}\n${loopStr}Volume: ${Math.round(state.volume * 100)}% | Requested by: <@${s.requester}>`;
+  let desc = `${plHeader}${bar}\n${loopStr}Volume: ${Math.round(state.volume * 100)}% | Requested by: <@${s.requester}>${s.source ? ` | via ${sourceLabel(s.source)}` : ''}`;
 
   const upNext = state.songs;
   if (upNext.length > 0) {
@@ -478,9 +458,7 @@ async function playSong(guild) {
   state.pausedTotal = 0;
 
   try {
-    const yt = await getYT();
-
-    const ytproc = yt.exec(['-f', 'bestaudio/best', '-o', '-', song.url]);
+    const ytproc = await spawnStream(song);
     state.ytproc = ytproc;
 
     const ffmpeg = spawn(
@@ -554,9 +532,7 @@ async function seekTo(guild, position) {
   state.pausedTotal = 0;
 
   try {
-    const yt = await getYT();
-
-    const ytproc = yt.exec(['-f', 'bestaudio/best', '--download-sections', `*${position}-`, '-o', '-', song.url]);
+    const ytproc = await spawnStream(song, { position });
     state.ytproc = ytproc;
 
     const ffmpeg = spawn(
@@ -777,7 +753,6 @@ export {
   previousTrack,
   removeFromQueue,
   removePlayerUI,
-  resolveSong,
   saveGuildPlaylists,
   saveQueue,
   seekTo,
