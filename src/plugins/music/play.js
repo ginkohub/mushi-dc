@@ -16,16 +16,21 @@ import { Browser, matchSource, pen, Role, resolvePlaylist } from '#mushi';
 import {
   connect,
   formatDuration,
-  getGuildPlaylists,
   getState,
   getTrackKey,
   getYT,
   isDuplicateTrack,
   playSong,
   resolveSong,
-  saveGuildPlaylists,
   sendPlayerUI,
 } from './_player.js';
+
+/** Queue-only: state.tracks is ephemeral memory, never synced to saved playlists. */
+function ensureActive(guild, channel) {
+  const state = getState(guild.id);
+  if (!state.textChannel && channel) state.textChannel = channel;
+  return state;
+}
 
 async function exec(c) {
   const query = c.event.options.getString('query') || '';
@@ -43,21 +48,7 @@ async function exec(c) {
   await c.event.deferReply();
 
   try {
-    const state = getState(guild.id);
-
-    if (!state.textChannel) state.textChannel = c.event.channel;
-
-    const playlists = getGuildPlaylists(guild.id);
-    if (!state.activePlaylist) {
-      state.activePlaylist = 'default';
-    }
-    if (!playlists[state.activePlaylist]) {
-      playlists[state.activePlaylist] = [];
-      saveGuildPlaylists(guild.id, playlists);
-    }
-    if (state.tracks.length === 0 && playlists[state.activePlaylist].length > 0) {
-      state.tracks = [...playlists[state.activePlaylist]];
-    }
+    const state = ensureActive(guild, c.event.channel);
 
     const isUrl = /^https?:\/\//.test(query);
     const matched = isUrl ? matchSource(query) : null;
@@ -74,10 +65,7 @@ async function exec(c) {
       }
       const limit = 50;
       const items = entries.slice(0, limit);
-      const existingKeys = new Set([
-        ...state.tracks.map(getTrackKey),
-        ...(playlists[state.activePlaylist] || []).map(getTrackKey),
-      ]);
+      const existingKeys = new Set(state.tracks.map(getTrackKey));
       const newTracks = [];
       for (const e of items) {
         const track = {
@@ -96,13 +84,11 @@ async function exec(c) {
       }
 
       if (newTracks.length === 0) {
-        await c.event.editReply('All songs from this playlist are already in the queue.');
+        await c.event.editReply('All songs from this URL are already in the queue.');
         return;
       }
 
       state.tracks.push(...newTracks);
-      playlists[state.activePlaylist].push(...newTracks);
-      saveGuildPlaylists(guild.id, playlists);
 
       const isPlaying = state.current !== null && state.player.state.status !== AudioPlayerStatus.Idle;
       if (!isPlaying) {
@@ -117,7 +103,7 @@ async function exec(c) {
       const skippedCount = items.length - newTracks.length;
       const skippedText = skippedCount > 0 ? ` (${skippedCount} duplicate(s) skipped)` : '';
       const limitText = items.length < entries.length ? ` (showing first ${limit})` : '';
-      const msg = `Added **${newTracks.length}** songs to playlist **${state.activePlaylist}**${skippedText}${limitText}.`;
+      const msg = `Added **${newTracks.length}** songs to the queue${skippedText}${limitText}.`;
       await c.event.editReply(msg);
     } else {
       const song = await resolveSong(query);
@@ -128,21 +114,12 @@ async function exec(c) {
       song.requester = c.senderId;
 
       const isPlaying = state.current !== null && state.player.state.status !== AudioPlayerStatus.Idle;
-      const activeQueue = isPlaying && state.currentIndex >= 0 ? state.tracks.slice(state.currentIndex) : [];
-      if (activeQueue.length > 0 && isDuplicateTrack(song, activeQueue)) {
+      if (isDuplicateTrack(song, state.tracks)) {
         await c.event.editReply(`**${song.title}** is already in the queue.`);
         return;
       }
 
-      const isNamedPlaylist = state.activePlaylist && state.activePlaylist !== 'default';
-      if (isNamedPlaylist && isDuplicateTrack(song, playlists[state.activePlaylist])) {
-        await c.event.editReply(`**${song.title}** is already in playlist **${state.activePlaylist}**.`);
-        return;
-      }
-
       state.tracks.push(song);
-      playlists[state.activePlaylist].push(song);
-      saveGuildPlaylists(guild.id, playlists);
 
       if (!isPlaying) {
         if (state.currentIndex === -1 || state.currentIndex >= state.tracks.length) {
@@ -155,7 +132,7 @@ async function exec(c) {
       }
 
       const msg = isPlaying
-        ? `Added to playlist **${state.activePlaylist}**: **${song.title}** (${formatDuration(song.duration)})`
+        ? `Added to queue: **${song.title}** (${formatDuration(song.duration)})`
         : `Now playing: **${song.title}** (${formatDuration(song.duration)})`;
 
       await c.event.editReply(msg);
@@ -205,17 +182,23 @@ async function autocomplete(event, signal) {
   }
 }
 
+const playOption = (o) =>
+  o.setName('query').setDescription('URL or search query').setRequired(true).setAutocomplete(true);
+
+const playContexts = (b) =>
+  b
+    .setIntegrationTypes(ApplicationIntegrationType.GuildInstall, ApplicationIntegrationType.UserInstall)
+    .setContexts(InteractionContextType.Guild, InteractionContextType.BotDM, InteractionContextType.PrivateChannel);
+
 const playSlash = {
   roles: [Role.GUEST],
   autocomplete,
-  data: new SlashCommandBuilder()
-    .setName('play')
-    .setDescription('Play a song from YouTube (URL or search)')
-    .addStringOption((o) =>
-      o.setName('query').setDescription('URL or search query').setRequired(true).setAutocomplete(true),
-    )
-    .setIntegrationTypes(ApplicationIntegrationType.GuildInstall, ApplicationIntegrationType.UserInstall)
-    .setContexts(InteractionContextType.Guild, InteractionContextType.BotDM, InteractionContextType.PrivateChannel),
+  data: playContexts(
+    new SlashCommandBuilder()
+      .setName('play')
+      .setDescription('Play a song from YouTube (URL or search)')
+      .addStringOption(playOption),
+  ),
   exec,
 };
 

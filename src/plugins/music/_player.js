@@ -99,10 +99,7 @@ function playerUI(state) {
   const loopStr = loopEmoji ? `${loopEmoji} ` : '';
 
   const bar = progressBar(state);
-  const plHeader = state.activePlaylist
-    ? `Playlist: **${state.activePlaylist}** (${state.currentIndex + 1}/${state.tracks.length})\n`
-    : '';
-  let desc = `${plHeader}${bar}\n${loopStr}Volume: ${Math.round(state.volume * 100)}% | Requested by: <@${s.requester}>${s.source ? ` | via ${sourceLabel(s.source)}` : ''}`;
+  let desc = `${bar}\n${loopStr}Volume: ${Math.round(state.volume * 100)}% | Requested by: <@${s.requester}>${s.source ? ` | via ${sourceLabel(s.source)}` : ''}`;
 
   const upNext = state.songs;
   if (upNext.length > 0) {
@@ -220,7 +217,6 @@ function startProgressTimer(state) {
 class GuildState {
   constructor(guildId) {
     this.guildId = guildId;
-    this.activePlaylist = null;
     this.tracks = [];
     this.currentIndex = -1;
     this.connection = null;
@@ -292,7 +288,7 @@ function getState(guildId) {
               if (state.currentIndex === -1) {
                 const tc = state.textChannel;
                 cleanup(guildId);
-                if (tc) tc.send('Playlist ended, leaving voice channel.').catch(() => {});
+                if (tc) tc.send('Queue ended, leaving voice channel.').catch(() => {});
               }
             }, 60_000);
           }
@@ -322,7 +318,7 @@ function getState(guildId) {
             if (state.currentIndex === -1) {
               const tc = state.textChannel;
               cleanup(guildId);
-              if (tc) tc.send('Playlist ended, leaving voice channel.').catch(() => {});
+              if (tc) tc.send('Queue ended, leaving voice channel.').catch(() => {});
             }
           }, 60_000);
         }
@@ -599,12 +595,6 @@ function shuffleQueue(guildId) {
   if (currentSong) {
     state.currentIndex = state.tracks.indexOf(currentSong);
   }
-
-  if (state.activePlaylist) {
-    const playlists = getGuildPlaylists(guildId);
-    playlists[state.activePlaylist] = [...state.tracks];
-    saveGuildPlaylists(guildId, playlists);
-  }
 }
 
 function removeFromQueue(guildId, index) {
@@ -632,12 +622,6 @@ function removeFromQueue(guildId, index) {
       removePlayerUI(state);
     }
   }
-
-  if (state.activePlaylist) {
-    const playlists = getGuildPlaylists(guildId);
-    playlists[state.activePlaylist] = [...state.tracks];
-    saveGuildPlaylists(guildId, playlists);
-  }
   return removed;
 }
 
@@ -649,11 +633,6 @@ function clearQueue(guildId) {
   state.player.stop();
   killProcs(state);
   removePlayerUI(state);
-  if (state.activePlaylist) {
-    const playlists = getGuildPlaylists(guildId);
-    playlists[state.activePlaylist] = [];
-    saveGuildPlaylists(guildId, playlists);
-  }
 }
 
 function moveInQueue(guildId, from, to) {
@@ -665,12 +644,6 @@ function moveInQueue(guildId, from, to) {
 
   if (currentSong) {
     state.currentIndex = state.tracks.indexOf(currentSong);
-  }
-
-  if (state.activePlaylist) {
-    const playlists = getGuildPlaylists(guildId);
-    playlists[state.activePlaylist] = [...state.tracks];
-    saveGuildPlaylists(guildId, playlists);
   }
   return true;
 }
@@ -688,6 +661,7 @@ function saveQueue(guildId, name, uid) {
     title: s.title,
     duration: s.duration,
     thumbnail: s.thumbnail,
+    source: s.source,
     requester: s.requester || uid,
   }));
   saveGuildPlaylists(guildId, playlists);

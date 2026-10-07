@@ -14,7 +14,6 @@ import { AudioPlayerStatus } from '@discordjs/voice';
 import { ApplicationIntegrationType, InteractionContextType, SlashCommandBuilder } from 'discord.js';
 import { Browser, Role } from '#mushi';
 import {
-  clearQueue,
   connect,
   dedupeTracks,
   formatDuration,
@@ -24,7 +23,6 @@ import {
   getYT,
   isDuplicateTrack,
   playSong,
-  removeFromQueue,
   resolveSong,
   saveGuildPlaylists,
   sendPlayerUI,
@@ -56,11 +54,6 @@ async function exec(c) {
       }
       case 'delete': {
         if (!name || !playlists[name]) return await c.event.editReply(`Playlist **${name}** not found.`);
-        const state = getState(guild.id);
-        if (state.activePlaylist === name) {
-          state.activePlaylist = null;
-          clearQueue(guild.id);
-        }
         delete playlists[name];
         saveGuildPlaylists(guild.id, playlists);
         await c.event.editReply(`Deleted playlist **${name}**.`);
@@ -69,10 +62,7 @@ async function exec(c) {
       case 'list': {
         const names = Object.keys(playlists);
         if (names.length === 0) return await c.event.editReply('There are no server playlists.');
-        const state = getState(guild.id);
-        const lines = names.map(
-          (n) => `**${n}** (${playlists[n].length} songs)${state.activePlaylist === n ? ' *(active)*' : ''}`,
-        );
+        const lines = names.map((n) => `**${n}** (${playlists[n].length} songs)`);
         await c.event.editReply(`**Server playlists:**\n${lines.join('\n')}`);
         break;
       }
@@ -80,12 +70,7 @@ async function exec(c) {
         if (!name || !playlists[name]) return await c.event.editReply(`Playlist **${name}** not found.`);
         const pl = playlists[name];
         if (pl.length === 0) return await c.event.editReply(`Playlist **${name}** is empty.`);
-        const state = getState(guild.id);
-        const lines = pl.map((s, i) => {
-          const isCurrent = state.activePlaylist === name && state.currentIndex === i;
-          const marker = isCurrent ? '▶️ ' : '';
-          return `**${marker}${i + 1}.** ${s.title} (${formatDuration(s.duration)})`;
-        });
+        const lines = pl.map((s, i) => `**${i + 1}.** ${s.title} (${formatDuration(s.duration)})`);
         await c.event.editReply(`**${name}** (${pl.length} songs):\n${lines.join('\n')}`);
         break;
       }
@@ -100,25 +85,6 @@ async function exec(c) {
         song.requester = uid;
         playlists[name].push(song);
         saveGuildPlaylists(guild.id, playlists);
-
-        const state = getState(guild.id);
-        if (state.activePlaylist === name) {
-          state.tracks.push(song);
-          const isPlaying = state.current !== null && state.player.state.status !== AudioPlayerStatus.Idle;
-          if (!isPlaying) {
-            const voiceChannel = c.event.member?.voice?.channel;
-            if (voiceChannel) {
-              if (state.currentIndex === -1 || state.currentIndex >= state.tracks.length) {
-                state.currentIndex = state.tracks.length - 1;
-              }
-              if (!state.textChannel) state.textChannel = c.event.channel;
-              await connect(guild, voiceChannel);
-              playSong(guild);
-            }
-          } else {
-            await sendPlayerUI(state);
-          }
-        }
 
         await c.event.editReply(`Added **${song.title}** to **${name}**.`);
         break;
@@ -136,17 +102,6 @@ async function exec(c) {
         playlists[name] = deduped;
         saveGuildPlaylists(guild.id, playlists);
 
-        const state = getState(guild.id);
-        if (state.activePlaylist === name) {
-          const currentSong = state.current;
-          state.tracks = [...deduped];
-          if (currentSong) {
-            const newIdx = state.tracks.findIndex((t) => getTrackKey(t) === getTrackKey(currentSong));
-            state.currentIndex = newIdx !== -1 ? newIdx : Math.min(state.currentIndex, state.tracks.length - 1);
-          }
-          await sendPlayerUI(state);
-        }
-
         await c.event.editReply(`Removed **${removedCount}** duplicate(s) from playlist **${name}**.`);
         break;
       }
@@ -156,14 +111,8 @@ async function exec(c) {
         if (index < 1 || index > playlists[name].length)
           return await c.event.editReply(`Index must be between 1 and ${playlists[name].length}.`);
 
-        const state = getState(guild.id);
-        let removed;
-        if (state.activePlaylist === name) {
-          removed = removeFromQueue(guild.id, index);
-        } else {
-          removed = playlists[name].splice(index - 1, 1)[0];
-          saveGuildPlaylists(guild.id, playlists);
-        }
+        const removed = playlists[name].splice(index - 1, 1)[0];
+        saveGuildPlaylists(guild.id, playlists);
 
         await c.event.editReply(`Removed **${removed?.title || `#${index}`}** from **${name}**.`);
         break;
@@ -179,14 +128,33 @@ async function exec(c) {
         const state = getState(guild.id);
         if (!state.textChannel) state.textChannel = c.event.channel;
 
-        state.activePlaylist = name;
-        state.tracks = pl.map((s) => ({ ...s, requester: s.requester || uid }));
-        state.currentIndex = 0;
+        const existingKeys = new Set(state.tracks.map(getTrackKey));
+        const newTracks = [];
+        for (const s of pl) {
+          const track = { ...s, requester: s.requester || uid };
+          const key = getTrackKey(track);
+          if (key && !existingKeys.has(key)) {
+            existingKeys.add(key);
+            newTracks.push(track);
+          }
+        }
 
-        await connect(guild, voiceChannel);
-        playSong(guild);
+        state.tracks.push(...newTracks);
 
-        await c.event.editReply(`Playing playlist **${name}** (${pl.length} songs).`);
+        const isPlaying = state.current !== null && state.player.state.status !== AudioPlayerStatus.Idle;
+        if (!isPlaying) {
+          if (state.currentIndex === -1 || state.currentIndex >= state.tracks.length) {
+            state.currentIndex = state.tracks.length - newTracks.length;
+          }
+          await connect(guild, voiceChannel);
+          playSong(guild);
+        } else {
+          await sendPlayerUI(state);
+        }
+
+        const skippedCount = pl.length - newTracks.length;
+        const skippedText = skippedCount > 0 ? ` (${skippedCount} duplicate(s) skipped)` : '';
+        await c.event.editReply(`Added **${newTracks.length}** songs from **${name}** to the queue${skippedText}.`);
         break;
       }
     }

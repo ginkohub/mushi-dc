@@ -17,26 +17,30 @@ async function exec(c) {
   if (!guild) return await c.react('❌');
 
   const state = getState(guild.id);
-  if (state.tracks.length === 0) return await c.reply('Playlist is empty.');
+  if (state.tracks.length === 0) return await c.reply('Queue is empty.');
 
-  const plName = state.activePlaylist || 'default';
-  const lines = [`**Playlist:** ${plName} (${state.tracks.length} songs)`];
-
-  const list = state.tracks
-    .slice(0, 25)
-    .map((s, i) => {
-      const isCurrent = i === state.currentIndex;
-      const marker = isCurrent ? '▶️ ' : '   ';
-      return `\`${marker}${i + 1}.\` ${s.title} (${formatDuration(s.duration)})`;
-    })
-    .join('\n');
-
-  lines.push(list);
-  if (state.tracks.length > 25) {
-    lines.push(`*+${state.tracks.length - 25} more*`);
+  const lines = [];
+  if (state.current) {
+    lines.push(`▶️ **Now playing:** ${state.current.title} (${formatDuration(state.current.duration)})`, '');
   }
 
-  await c.reply(lines.join('\n\n'));
+  const upNext = state.songs;
+  if (upNext.length > 0) {
+    lines.push(`**Up next (${upNext.length}):**`);
+    lines.push(
+      upNext
+        .slice(0, 10)
+        .map((s, i) => `\`${i + 1}.\` ${s.title} (${formatDuration(s.duration)})`)
+        .join('\n'),
+    );
+    if (upNext.length > 10) {
+      lines.push(`*+${upNext.length - 10} more*`);
+    }
+  } else if (!state.current) {
+    lines.push('Queue is empty.');
+  }
+
+  await c.reply(lines.join('\n'));
 }
 
 const queueSlash = {
