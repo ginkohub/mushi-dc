@@ -22,7 +22,7 @@ const USER_AGENT =
 
 const MODEL_HEADER_NAME = 'x-goog-ext-525001261-jspb';
 
-function makeModelHeader(hash, idx) {
+function makeModelHeader(hash, idx, b = 1) {
   return JSON.stringify([
     1,
     null,
@@ -39,7 +39,7 @@ function makeModelHeader(hash, idx) {
     null,
     null,
     idx,
-    1,
+    b,
     crypto.randomUUID(),
   ]);
 }
@@ -48,12 +48,18 @@ const MODEL_HEADERS = {
   'gemini-3.1-pro': makeModelHeader('e6fa609c3fa255c0', 3),
   'gemini-3.5-flash': makeModelHeader('56fdd199312815e2', 1),
   'gemini-3.1-flash-lite': makeModelHeader('8c46e95b1a07cecc', 6),
+  'gemini-3.5-flash-lite': makeModelHeader('cf41b0e0dd7d53e5', 6),
+  'gemini-3.6-flash': makeModelHeader('fbb127bbb056c959', 1),
+  'gemini-3.6-flash-expanded': makeModelHeader('fbb127bbb056c959', 1, 2),
 };
-const DEFAULT_MODEL = 'gemini-3.1-flash-lite';
+const DEFAULT_MODEL = 'gemini-3.5-flash-lite';
 const MODEL_LIMITS = {
   'gemini-3.1-pro': 1_048_576,
   'gemini-3.5-flash': 1_048_576,
   'gemini-3.1-flash-lite': 1_048_576,
+  'gemini-3.5-flash-lite': 1_048_576,
+  'gemini-3.6-flash': 1_048_576,
+  'gemini-3.6-flash-expanded': 1_048_576,
 };
 const ALL_COOKIE_NAMES = [
   '__Secure-1PSID',
@@ -318,7 +324,7 @@ class GeminiClient {
     return { text: this.#cleanText(text) };
   }
 
-  async #request(prompt, model = DEFAULT_MODEL, chatMetadata = null, systemPrompt = null, info = null) {
+  async #request(prompt, model = DEFAULT_MODEL, chatMetadata = null, modelHeader = null, systemPrompt = null, info = null) {
     const at = await this.#getAccessToken();
     const cookieHeader = buildCookieHeader(this.#cookieMap);
 
@@ -367,7 +373,7 @@ class GeminiClient {
       referer: 'https://gemini.google.com/',
       'x-same-domain': '1',
       cookie: cookieHeader,
-      [MODEL_HEADER_NAME]: MODEL_HEADERS[model] || MODEL_HEADERS[DEFAULT_MODEL],
+      [MODEL_HEADER_NAME]: modelHeader || MODEL_HEADERS[model] || MODEL_HEADERS[DEFAULT_MODEL],
     };
 
     const res = await this.#httpsPost(GEMINI_STREAM_GENERATE_URL, headers, params.toString(), {
@@ -391,7 +397,7 @@ class GeminiClient {
     const info = options.info || null;
     const startTime = Date.now();
 
-    const result = await this.#request(prompt, model, null, null, systemPrompt, info);
+    const result = await this.#request(prompt, model, null, options.modelHeader || null, systemPrompt, info);
 
     return {
       response: result.text,

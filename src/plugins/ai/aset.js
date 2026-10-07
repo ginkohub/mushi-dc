@@ -18,6 +18,7 @@ import {
   getCompactBuffer,
   getCompactCeiling,
   getHistory,
+  getHistoryKey,
   getSystemPrompt,
   getTimezone,
   loadCookies,
@@ -208,7 +209,7 @@ async function handleCompact(c) {
   }
 
   if (action === 'now') {
-    const historyKey = c.event.guild?.id || c.event.guildId || c.event.channel?.id || c.event.user?.id || 'dm';
+    const historyKey = getHistoryKey(c.event);
     const h = getHistory(historyKey);
     const info = [
       `messages: ${h.length}`,
@@ -249,7 +250,7 @@ async function handleCompact(c) {
 }
 
 async function handleClear(c) {
-  const key = c.event.guild?.id || c.event.guildId || c.event.channel?.id || c.event.user?.id || 'dm';
+  const key = getHistoryKey(c.event);
   clearHistory(key);
   await c.reply(t('cleared', {}, c));
 }

@@ -8,11 +8,14 @@
  * This code is part of Ginko project (https://github.com/ginkohub)
  */
 
+import fs from 'node:fs';
+import path from 'node:path';
 import { read, write } from '#mushi';
+import pen from '#mushi/pen.js';
 import { GeminiClient, tagIt } from './client.js';
 
 const DEFAULT_SYSTEM_PROMPT =
-  "Your name is Mushi, humble, always energetic and enthusiastic, love programming, calm. Speak in casual, everyday language using 'you' (kamu) and 'I' (aku). Keep sentences as short as possible, like a Discord chat. Respond without conversational formatting and keep it under 2000 characters.";
+  "Your name is Mushi, humble, always energetic and enthusiastic, calm. Speak in casual, everyday language using 'you' (kamu) and 'I' (aku). Keep sentences as short as possible, like a Discord chat. Respond without conversational formatting and keep it under 2000 characters.";
 
 export function loadCookies() {
   const data = read();
@@ -63,11 +66,64 @@ export function getClient() {
 
 export const geminiMessages = new Set();
 
+/**
+ * Shared history key: one thread per channel, falling back to guild,
+ * user, or 'dm'. Prefixed so raw guild ids from older versions can't collide.
+ */
+export function getHistoryKey(msg) {
+  const channel = msg?.channel?.id || msg?.channelId || null;
+  if (channel) return `ch:${channel}`;
+  const guild = msg?.guild?.id || msg?.guildId || null;
+  if (guild) return `g:${guild}`;
+  const user = msg?.author?.id || msg?.user?.id || null;
+  if (user) return `u:${user}`;
+  return 'dm';
+}
+
 const conversationHistory = new Map();
 const MAX_HISTORY = 10;
 const MAX_CONTENT_LENGTH = 500;
-const DEFAULT_COMPACT_CEILING = 100_000;
-const DEFAULT_COMPACT_BUFFER = 10_000;
+// Real capacity ≈ 20 msgs × 500 chars ≈ 2.5k tokens, so the trigger
+// must sit just below it (was 90k: effectively never fired).
+const DEFAULT_COMPACT_CEILING = 2000;
+const DEFAULT_COMPACT_BUFFER = 500;
+const MAX_STORED_KEYS = 100;
+let saveTimer = null;
+const deletedKeys = new Set();
+
+const HISTORY_FILE = path.join(import.meta.dirname, '../../../gemini.json');
+
+function readHistoryFile() {
+  try {
+    if (!fs.existsSync(HISTORY_FILE)) return {};
+    const raw = fs.readFileSync(HISTORY_FILE, 'utf-8').trim();
+    if (!raw) return {};
+    const data = JSON.parse(raw);
+    return data && typeof data === 'object' ? data : {};
+  } catch {
+    return {};
+  }
+}
+
+function scheduleSave() {
+  if (saveTimer) return;
+  saveTimer = setTimeout(() => {
+    saveTimer = null;
+    try {
+      const stored = readHistoryFile();
+      for (const k of deletedKeys) delete stored[k];
+      deletedKeys.clear();
+      for (const [k, v] of conversationHistory) stored[k] = v;
+      const keys = Object.keys(stored);
+      if (keys.length > MAX_STORED_KEYS) {
+        for (const k of keys.slice(0, keys.length - MAX_STORED_KEYS)) delete stored[k];
+      }
+      fs.writeFileSync(HISTORY_FILE, JSON.stringify(stored, null, 2));
+    } catch (e) {
+      pen.Error('ai-history-save', e?.message ?? e);
+    }
+  }, 5000);
+}
 
 export { DEFAULT_COMPACT_BUFFER, DEFAULT_COMPACT_CEILING, MAX_CONTENT_LENGTH, MAX_HISTORY };
 
@@ -77,13 +133,18 @@ function estTokens(text) {
 
 export function getHistory(channelId) {
   if (!conversationHistory.has(channelId)) {
-    conversationHistory.set(channelId, []);
+    conversationHistory.set(channelId, readHistoryFile()[channelId] ?? []);
+    if (!Array.isArray(conversationHistory.get(channelId))) {
+      conversationHistory.set(channelId, []);
+    }
   }
   return conversationHistory.get(channelId);
 }
 
 export function clearHistory(channelId) {
   conversationHistory.delete(channelId);
+  deletedKeys.add(channelId);
+  scheduleSave();
 }
 
 export function addHistory(channelId, messages) {
@@ -95,6 +156,7 @@ export function addHistory(channelId, messages) {
     h.push(m);
   }
   if (h.length > MAX_HISTORY * 2) h.splice(0, h.length - MAX_HISTORY * 2);
+  scheduleSave();
 }
 
 export function formatHistory(channelId) {
@@ -133,6 +195,7 @@ export async function summarizeHistory(channelId, client) {
           time: new Date().toISOString(),
         },
       ]);
+      scheduleSave();
     }
   } catch (e) {
     console.error('[ai] compact failed:', e);

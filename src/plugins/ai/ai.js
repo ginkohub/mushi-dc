@@ -16,6 +16,7 @@ import {
   formatHistory,
   geminiMessages,
   getClient,
+  getHistoryKey,
   getModel,
   getSystemPrompt,
   shouldCompact,
@@ -39,10 +40,6 @@ const t = translate({
     unexpected: 'Kesalahan tak terduga: {msg}',
   },
 });
-
-function getHistoryKey(msg) {
-  return msg.guild?.id || msg.guildId || msg.channel?.id || msg.author?.id || 'dm';
-}
 
 function splitText(text, maxLen = 2000) {
   if (text.length <= maxLen) return [text];
@@ -130,6 +127,16 @@ async function sendChunks(text, sender) {
   return sent;
 }
 
+/**
+ * Keep the Discord typing indicator alive (each lasts ~10s) until stop() is called.
+ * Needed because Gemini answers often take longer than one typing pulse.
+ */
+function startTypingLoop(channel) {
+  channel?.sendTyping?.().catch(() => {});
+  const timer = setInterval(() => channel?.sendTyping?.().catch(() => {}), 8000);
+  return () => clearInterval(timer);
+}
+
 const chatExec = async (c) => {
   const query = c.event.options.getString('text');
   const historyKey = getHistoryKey(c.event);
@@ -181,7 +188,7 @@ const prefixExec = async (c) => {
   }
 
   const historyKey = getHistoryKey(msg);
-  await msg.channel?.sendTyping?.().catch(() => {});
+  const stopTyping = startTypingLoop(msg.channel);
   try {
     const info = {
       user: { name: msg.author?.globalName, username: msg.author?.username },
@@ -206,6 +213,8 @@ const prefixExec = async (c) => {
   } catch (e) {
     pen.Error('AI', e);
     await msg.react('❌').catch(() => {});
+  } finally {
+    stopTyping();
   }
 };
 
@@ -230,6 +239,7 @@ const replyExec = async (c) => {
   if (!query) return;
 
   const historyKey = getHistoryKey(msg);
+  const stopTyping = startTypingLoop(msg.channel);
   try {
     const info = {
       user: { name: msg.author?.globalName, username: msg.author?.username },
@@ -251,6 +261,8 @@ const replyExec = async (c) => {
   } catch (e) {
     pen.Error('AI', e);
     await msg.react('❌').catch(() => {});
+  } finally {
+    stopTyping();
   }
 };
 
