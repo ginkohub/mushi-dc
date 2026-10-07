@@ -10,7 +10,7 @@
 
 import { ApplicationIntegrationType, InteractionContextType, SlashCommandBuilder } from 'discord.js';
 import { Role } from '#mushi';
-import { getState, stop } from './_player.js';
+import { getState, getStay, stop } from './_player.js';
 
 async function exec(c) {
   const guild = c.event.guild;
@@ -19,9 +19,12 @@ async function exec(c) {
   const state = getState(guild.id);
   if (!state.connection) return await c.reply('Not connected to a voice channel.');
 
+  const staying = getStay(guild.id) || state.stayChannelId;
   stop(guild.id);
 
-  await c.reply('Stopped playing and left the voice channel.');
+  await c.reply(
+    staying ? 'Stopped playing. Staying in the voice channel.' : 'Stopped playing and left the voice channel.',
+  );
 }
 
 const stopSlash = {

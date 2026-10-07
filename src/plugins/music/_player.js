@@ -137,8 +137,7 @@ function nowPlayingEmbed(state) {
   const title = s.url ? `[**${s.title}**](${s.url})` : `**${s.title}**`;
   const lines = [title];
 
-  const bar = progressBar(state);
-  if (bar) lines.push(bar);
+  if (s.duration) lines.push(`-# ⏱ ${formatDuration(s.duration)}`);
   if (s.artist) lines.push(`-# 🎤 ${s.artist}`);
   if (s.requester) lines.push(`-# 👤 Requested by <@${s.requester}>`);
   lines.push(
@@ -235,23 +234,6 @@ function formatDuration(seconds) {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-function getElapsed(state) {
-  if (!state.startedAt) return 0;
-  let paused = state.pausedTotal;
-  if (state.pausedAt) paused += Date.now() - state.pausedAt;
-  return Math.max(0, (Date.now() - state.startedAt - paused) / 1000);
-}
-
-function progressBar(state) {
-  const s = state.current;
-  if (!s?.duration) return '';
-  const elapsed = getElapsed(state);
-  const ratio = Math.min(1, elapsed / s.duration);
-  const len = 16;
-  const filled = Math.round(ratio * len);
-  return `${'█'.repeat(filled)}${'░'.repeat(len - filled)} ${formatDuration(elapsed)} / ${formatDuration(s.duration)}`;
-}
-
 function stopProgressTimer(state) {
   if (state.progressInterval) {
     clearInterval(state.progressInterval);
@@ -259,9 +241,10 @@ function stopProgressTimer(state) {
   }
 }
 
+// No periodic UI edits: the player message is only updated on state changes
+// (play/pause/skip/etc). Kept as a no-op for existing callers.
 function startProgressTimer(state) {
   stopProgressTimer(state);
-  state.progressInterval = setInterval(() => sendPlayerUI(state), 5000);
 }
 
 class GuildState {
@@ -759,7 +742,13 @@ function setVolume(guildId, vol) {
 }
 
 function stop(guildId) {
-  setStay(guildId, null);
+  const state = getState(guildId);
+  // Stay mode: halt playback and clear the queue, but keep the voice connection.
+  if (getStay(guildId) || state.stayChannelId) {
+    clearQueue(guildId);
+    state.skipRequested = false;
+    return;
+  }
   disconnect(guildId);
 }
 
