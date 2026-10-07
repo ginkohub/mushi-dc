@@ -12,7 +12,7 @@
  */
 
 import { ApplicationIntegrationType, InteractionContextType, SlashCommandBuilder } from 'discord.js';
-import { Browser, Role, translate } from '#mushi';
+import { Browser, pen, Role, translate } from '#mushi';
 
 const t = translate({
   en: {
@@ -31,19 +31,26 @@ async function pinterest(c) {
   const args = c.event.options.getString('query') || '';
   if (!args || args === '?') return await c.reply(t('help', {}, c));
   const limit = 5;
-  await c.react('⏳');
+  await c.event.deferReply().catch(() => {});
+  await c.react('⏳').catch(() => {});
   try {
     const data = await Browser.json(
       `https://api.siputzx.my.id/api/s/pinterest?query=${encodeURIComponent(args)}&type=image`,
     );
-    if (!data?.status || !data.data?.length) return await c.reply(t('not_found', { query: args }, c));
+    if (!data?.status || !data.data?.length) {
+      await c.event.editReply(t('not_found', { query: args }, c)).catch(() => {});
+      return;
+    }
     const items = data.data.slice(0, limit);
-    await c.reply({
-      content: `${data.data.length} results found for "${args}"`,
-      files: items.map((i) => i.image_url),
-    });
-  } catch {
-    await c.react('❌');
+    await c.event
+      .editReply({
+        content: t('header', { query: args }, c),
+        files: items.map((i) => i.image_url).filter(Boolean),
+      })
+      .catch(() => {});
+  } catch (e) {
+    pen.Error('pinterest', e?.message ?? e);
+    await c.event.editReply('Failed to fetch Pinterest results. Please try again later.').catch(() => {});
   }
 }
 

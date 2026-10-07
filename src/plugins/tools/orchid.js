@@ -12,25 +12,37 @@
  */
 
 import { ApplicationIntegrationType, InteractionContextType, SlashCommandBuilder } from 'discord.js';
-import { Browser, Role } from '#mushi';
+import { Browser, pen, Role } from '#mushi';
 
 async function orchid(c) {
   if (c.isSlash) {
     const query = c.event.options.getString('query') || '';
     const max = c.event.options.getInteger('max');
     c.args = max ? `-n ${max} ${query}` : query;
+    await c.event.deferReply().catch(() => {});
   }
   const args = (c.args || '').trim();
   const maxMatch = args.match(/(?:^|\s)(?:-n|--max)\s+(\d+)(?:\s|$)/);
   const maxRows = Math.min(Math.max(parseInt(maxMatch?.[1], 10) || 10, 1), 10);
   const query = args.replace(/(?:^|\s)(?:-n|--max)\s+\d+(?:\s|$)/, ' ').trim();
-  if (!query) return await c.react('❌');
+  if (!query) {
+    if (c.isSlash) await c.event.editReply('Query is required.').catch(() => {});
+    else await c.react('❌');
+    return;
+  }
+  const send = async (content) => {
+    if (c.isSlash) await c.event.editReply(content).catch(() => {});
+    else await c.reply(content);
+  };
   try {
     const data = await Browser.json(
       `https://api.crossref.org/works?query=${encodeURIComponent(query)}&rows=${maxRows}&sort=relevance`,
     );
     const items = data.message?.items;
-    if (!items?.length) return await c.reply('No results.');
+    if (!items?.length) {
+      await send('No results.');
+      return;
+    }
     const top = items.slice(0, maxRows);
     const total = data.message['total-results'] || items.length;
     const lines = [`**${total}** results found for "${query}"`];
@@ -45,9 +57,14 @@ async function orchid(c) {
       const linkStr = link ? (i === 0 ? `\n   ${link}` : `\n   <${link}>`) : '';
       lines.push(`**${i + 1}.** ${r.title?.[0] || 'Untitled'} — *${author}* (${year})${linkStr}`);
     });
-    await c.reply(lines.join('\n'));
-  } catch {
-    await c.react('❌');
+    await send(lines.join('\n'));
+  } catch (e) {
+    pen.Error('orchid', e?.message ?? e);
+    if (c.isSlash) {
+      await c.event.editReply('Failed to fetch CrossRef results. Please try again later.').catch(() => {});
+    } else {
+      await c.react('❌');
+    }
   }
 }
 
