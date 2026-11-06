@@ -319,6 +319,7 @@ function getState(guildId) {
           if (g) playSong(g);
         } else {
           state.currentIndex = -1;
+          state.tracks = [];
           removePlayerUI(state);
           scheduleAutoLeave(guildId);
         }
@@ -341,6 +342,7 @@ function getState(guildId) {
         if (g) playSong(g);
       } else {
         state.currentIndex = -1;
+        state.tracks = [];
         removePlayerUI(state);
         scheduleAutoLeave(guildId);
       }
@@ -356,6 +358,7 @@ function getState(guildId) {
         if (g) playSong(g);
       } else {
         state.currentIndex = -1;
+        state.tracks = [];
         removePlayerUI(state);
       }
     });
@@ -430,6 +433,7 @@ function disconnect(guildId) {
   const state = getState(guildId);
   stopProgressTimer(state);
   state.currentIndex = -1;
+  state.tracks = [];
   state.loopMode = 0;
   state.startedAt = null;
   state.pausedAt = null;
@@ -452,6 +456,7 @@ function cleanup(guildId) {
   const state = getState(guildId);
   stopProgressTimer(state);
   state.currentIndex = -1;
+  state.tracks = [];
   state.loopMode = 0;
   state.startedAt = null;
   state.pausedAt = null;
