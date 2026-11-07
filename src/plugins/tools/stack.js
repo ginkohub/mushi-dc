@@ -54,6 +54,20 @@ async function readArticle(c) {
   const url = (c.args || '').trim();
   if (!url) return await c.react('❌');
   await c.react('⏳');
+  const send = async (content) => {
+    if (c.isSlash) {
+      await c.event.followUp(content).catch(() => {});
+    } else {
+      await c.reply(content);
+    }
+  };
+  const sendRest = async (content) => {
+    if (c.isSlash) {
+      await c.event.followUp(content).catch(() => {});
+    } else {
+      await c.send(content);
+    }
+  };
   try {
     const html = await Browser.getText(url);
     const $ = cheerio.load(html);
@@ -94,11 +108,16 @@ async function readArticle(c) {
     const chunks = splitText(content, 1900);
     for (let i = 0; i < chunks.length; i++) {
       const msg = i === 0 ? `${header}\n\n${chunks[i]}` : chunks[i];
-      if (i === 0) await c.reply(msg);
-      else await c.send(msg);
+      if (i === 0) await send(msg);
+      else await sendRest(msg);
     }
-  } catch {
-    await c.react('❌');
+  } catch (e) {
+    pen.Error('stack-read', e?.message ?? e);
+    if (c.isSlash) {
+      await c.event.followUp('Failed to read the article. Please try again later.').catch(() => {});
+    } else {
+      await c.react('❌');
+    }
   }
 }
 
@@ -106,14 +125,29 @@ async function searchPosts(c) {
   const query = (c.args || '').trim();
   if (!query) return await c.react('❌');
   await c.react('⏳');
+  const send = async (content) => {
+    if (c.isSlash) {
+      await c.event.followUp(content).catch(() => {});
+    } else {
+      await c.reply(content);
+    }
+  };
   try {
     const data = await Browser.json(`${SEARCH_API}?query=${encodeURIComponent(`site:substack.com ${query}`)}`);
-    if (!data?.status || !data.data?.results?.length) return await c.reply('No results found.');
+    if (!data?.status || !data.data?.results?.length) {
+      await send('No results found.');
+      return;
+    }
     const items = data.data.results.slice(0, 5);
     const lines = items.map((r, i) => `**${i + 1}.** [${r.title}](${r.url})\n${r.snippet}`);
-    await c.reply(`**Substack Search: ${query}**\n\n${lines.join('\n\n')}`.slice(0, 1900));
-  } catch {
-    await c.react('❌');
+    await send(`**Substack Search: ${query}**\n\n${lines.join('\n\n')}`.slice(0, 1900));
+  } catch (e) {
+    pen.Error('stack-search', e?.message ?? e);
+    if (c.isSlash) {
+      await c.event.followUp('Failed to search. Please try again later.').catch(() => {});
+    } else {
+      await c.react('❌');
+    }
   }
 }
 
@@ -161,6 +195,8 @@ export default [
       .setContexts(InteractionContextType.Guild, InteractionContextType.BotDM, InteractionContextType.PrivateChannel),
     autocomplete: autoStack,
     exec: async (c) => {
+      if (!c.isSlash) return await c.react('❌');
+      await c.event.deferReply().catch(() => {});
       const sub = c.event.options.getSubcommand();
       if (sub === 'read') {
         c.args = c.event.options.getString('url') || '';
