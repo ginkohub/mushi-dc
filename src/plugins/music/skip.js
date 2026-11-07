@@ -20,9 +20,15 @@ async function exec(c) {
   if (!state.current) return await c.reply('Nothing is currently playing.');
 
   const song = state.current;
+  const upNext = state.songs[0] ?? null;
   skip(guild.id);
 
-  await c.reply(`Skipped **${song.title}**`);
+  /* Radio gap: the player embed shows "picking next song…" until the mix lands */
+  await c.reply(
+    upNext && upNext !== song
+      ? `Skipped **${song.title}** — next up **${upNext.title}**`
+      : `Skipped **${song.title}**${state.autoplay ? '' : ' — queue empty'}`,
+  );
 }
 
 const skipSlash = {

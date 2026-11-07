@@ -203,3 +203,5 @@ const playSlash = {
 };
 
 export default [playSlash];
+
+export { autocomplete as playAutocomplete };

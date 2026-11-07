@@ -163,6 +163,24 @@ function nowPlayingEmbed(state) {
 
 function playerUI(state) {
   const s = state.current;
+  if (!s && state.radioPick) {
+    /* Radio mid-pick: keep the player message visible and honest about the gap */
+    return {
+      embeds: [
+        {
+          color: 0xffa500,
+          author: { name: '🔎 Autoplay' },
+          description: '*Picking the next song from the mix…*',
+        },
+      ],
+      components: [
+        new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId('mp_stop').setEmoji('⏹️').setStyle(ButtonStyle.Danger),
+        ),
+      ],
+      allowedMentions: { repliedUser: false },
+    };
+  }
   if (!s) return null;
 
   const paused = state.player.state.status === 'paused';
@@ -192,27 +210,37 @@ function playerUI(state) {
   return { embeds: [embed], components: [row1, row2], allowedMentions: { repliedUser: false } };
 }
 
-async function sendPlayerUI(state) {
-  if (!state.playerMsg && state.textChannel) {
-    const ui = playerUI(state);
-    if (!ui) return;
-    try {
-      const msg = await state.textChannel.send(ui);
-      state.playerMsg = msg;
-    } catch {
-      state.playerMsg = null;
-    }
-  } else if (state.playerMsg) {
-    const ui = playerUI(state);
-    if (!ui) {
-      removePlayerUI(state);
-      return;
-    }
+/** Serialize player-UI refreshes: concurrent callers re-check after the previous one lands,
+ *  so racing path (playSong + prefetch) can't both see a null pointer and double-send. */
+function sendPlayerUI(state) {
+  state.uiChain = (state.uiChain ?? Promise.resolve()).then(() => _sendPlayerUI(state)).catch(() => {});
+  return state.uiChain;
+}
+
+async function _sendPlayerUI(state) {
+  const ui = playerUI(state);
+  if (!ui) {
+    /* nothing to show in the current gap state; drop an existing message */
+    removePlayerUI(state);
+    return;
+  }
+  if (state.playerMsg) {
     try {
       await state.playerMsg.edit(ui);
+      pen.Debug('PlayerUI', 'edited', `msg=${state.playerMsg?.id ?? null}`);
+      return;
     } catch {
-      state.playerMsg = null;
+      pen.Debug('PlayerUI', 'edit failed, resending');
+      state.playerMsg = null; /* stale/deleted player message */
     }
+  }
+  if (!state.textChannel) return;
+  try {
+    const msg = await state.textChannel.send(ui);
+    state.playerMsg = msg;
+    pen.Debug('PlayerUI', 'sent', `msg=${msg.id}`);
+  } catch {
+    state.playerMsg = null;
   }
 }
 
@@ -259,6 +287,8 @@ class GuildState {
     this.textChannel = null;
     this.volume = 1;
     this.loopMode = 0;
+    this.autoplay = false;
+    this.radioPick = false;
     this.stayChannelId = null;
     this.startedAt = null;
     this.pausedAt = null;
@@ -269,6 +299,7 @@ class GuildState {
     this.ytproc = null;
     this.playerMsg = null;
     this.skipRequested = false;
+    this.nextPick = null;
   }
 
   get current() {
@@ -300,7 +331,7 @@ function getState(guildId) {
       state.stayChannelId = data.stay[guildId].channelId;
     }
 
-    state.player.on(AudioPlayerStatus.Idle, () => {
+    state.player.on(AudioPlayerStatus.Idle, async () => {
       stopProgressTimer(state);
       state.pausedAt = null;
       state.pausedTotal = 0;
@@ -317,11 +348,8 @@ function getState(guildId) {
         }
         if (state.currentIndex < state.tracks.length) {
           if (g) playSong(g);
-        } else {
-          state.currentIndex = -1;
-          state.tracks = [];
-          removePlayerUI(state);
-          scheduleAutoLeave(guildId);
+        } else if (!(await fillAutoplay(g, state))) {
+          clearEndedQueue(guildId, state);
         }
         return;
       }
@@ -340,15 +368,12 @@ function getState(guildId) {
       state.currentIndex++;
       if (state.currentIndex < state.tracks.length) {
         if (g) playSong(g);
-      } else {
-        state.currentIndex = -1;
-        state.tracks = [];
-        removePlayerUI(state);
-        scheduleAutoLeave(guildId);
+      } else if (!(await fillAutoplay(g, state))) {
+        clearEndedQueue(guildId, state);
       }
     });
 
-    state.player.on('error', (err) => {
+    state.player.on('error', async (err) => {
       pen.Error('AudioPlayer error', err);
       stopProgressTimer(state);
       killProcs(state);
@@ -356,7 +381,7 @@ function getState(guildId) {
       state.currentIndex++;
       if (state.currentIndex < state.tracks.length) {
         if (g) playSong(g);
-      } else {
+      } else if (!(await fillAutoplay(g, state))) {
         state.currentIndex = -1;
         state.tracks = [];
         removePlayerUI(state);
@@ -435,6 +460,7 @@ function disconnect(guildId) {
   state.currentIndex = -1;
   state.tracks = [];
   state.loopMode = 0;
+  state.autoplay = false;
   state.startedAt = null;
   state.pausedAt = null;
   state.pausedTotal = 0;
@@ -458,6 +484,7 @@ function cleanup(guildId) {
   state.currentIndex = -1;
   state.tracks = [];
   state.loopMode = 0;
+  state.autoplay = false;
   state.startedAt = null;
   state.pausedAt = null;
   state.pausedTotal = 0;
@@ -494,6 +521,149 @@ export function handleVoiceChannelDelete(guildId, channelId) {
   cleanup(guildId);
   if (tc) tc.send('Voice channel was deleted, stopped playback.').catch(() => {});
   return true;
+}
+
+const AUTOPLAY_SEEDS = [
+  'top music hits this week',
+  'popular songs right now',
+  'trending music playlist',
+  'best pop songs of all time mix',
+  'viral hits playlist',
+];
+
+/** Next autoplay pick: YouTube Mix of the last played track, else a random seed search. */
+async function pickAutoplayTrack(state) {
+  const seed = state.tracks[state.tracks.length - 1] ?? null;
+  const toTrack = (r) => {
+    const url = r?.url || (r?.id ? `https://youtube.com/watch?v=${r.id}` : null);
+    if (!url || !r.title) return null;
+    return {
+      url,
+      title: r.title,
+      artist: r.artist ?? r.uploader ?? r.channel ?? null,
+      duration: r.duration || 0,
+      thumbnail: r.thumbnail ?? null,
+      source: 'youtube',
+      requester: seed?.requester ?? null,
+    };
+  };
+
+  if (seed) {
+    const key = getTrackKey(seed);
+    const seedId = key.startsWith('yt:') ? key.slice(3) : null;
+    if (seedId) {
+      try {
+        const mix = await (await getYT()).getPlaylistInfo(
+          `https://youtube.com/watch?v=${seedId}&list=RD${seedId}`,
+          20 /* one page of the mix — full flat-page is ~400 entries and takes 15s+ */,
+        );
+        for (const r of mix ?? []) {
+          const track = toTrack(r);
+          if (!track || isDuplicateTrack(track, state.tracks)) continue;
+          return track;
+        }
+      } catch {
+        /* mix fetch failed — fall back to search below */
+      }
+    }
+    /* Non-YT seed (no mix available) or mix fetch failed */
+    const query = [seed.artist, seed.title].filter(Boolean).join(' ') || seed.title;
+    const yt = await getYT();
+    const results = (await yt.search(query, 10).catch(() => null)) ?? [];
+    for (const r of results) {
+      const track = toTrack(r);
+      if (!track || isDuplicateTrack(track, state.tracks)) continue;
+      return track;
+    }
+    return null;
+  }
+
+  const query = AUTOPLAY_SEEDS[Math.floor(Math.random() * AUTOPLAY_SEEDS.length)];
+  const yt = await getYT();
+  const results = (await yt.search(query, 25).catch(() => null)) ?? [];
+  const picks = [];
+  for (const r of results) {
+    const track = toTrack(r);
+    if (!track || isDuplicateTrack(track, state.tracks)) continue;
+    picks.push(track);
+  }
+  return picks.length ? picks[Math.floor(Math.random() * picks.length)] : null;
+}
+
+/** Returns the next radio track, appending it to the queue. Awaited pick dedupes via state.nextPick. */
+async function radioNext(guild, state) {
+  if (!state.autoplay || !guild) return null;
+  if (state.songs[0]) return state.songs[0]; /* already prefetched */
+  if (state.nextPick) {
+    /* Pick already in flight (prefetch racing the gap): wait for it */
+    const track = await state.nextPick;
+    return track ?? null;
+  }
+
+  state.radioPick = true;
+  sendPlayerUI(state); /* orange picking view shows only in a gap (no current track) */
+  state.nextPick = (async () => {
+    try {
+      return await pickAutoplayTrack(state);
+    } finally {
+      /* flags only — the UI refresh must happen AFTER the track is pushed,
+         otherwise a gap-cycle flips the player view to null and deletes it */
+      state.radioPick = false;
+      state.nextPick = null;
+    }
+  })();
+
+  const track = await state.nextPick;
+  if (track) {
+    state.tracks.push(track);
+    sendPlayerUI(state); /* edits the same message: picking view → Up next / Now playing */
+    return track;
+  }
+  if (!state.current) {
+    sendPlayerUI(state); /* gap failure: drops the picking view (message removed) */
+    if (state.textChannel) {
+      state.textChannel.send('🔎 Radio could not find a next song — playback stopped.').catch(() => {});
+    }
+  }
+  return null;
+}
+
+/** Queue ran dry with autoplay on: pick and play the next related track. */
+async function fillAutoplay(guild, state) {
+  if (!state.autoplay || !guild) return false;
+  const track = await radioNext(guild, state);
+  if (!track) return false;
+
+  /* The caller already advanced currentIndex past the old queue end; the pick lands there */
+  await playSong(guild); /* sendPlayerUI inside shows the picked track */
+  return true;
+}
+
+/** Start autoplay radio: join the channel and play the seed (or a fresh pick) right away. */
+async function startAutoplay(guild, voiceChannel, seed = null) {
+  const state = getState(guild.id);
+  await connect(guild, voiceChannel);
+  state.autoplay = true;
+
+  const isPlaying = state.current !== null && state.player.state.status !== AudioPlayerStatus.Idle;
+  if (isPlaying) return null;
+
+  const track = seed ?? (await pickAutoplayTrack(state));
+  if (!track) {
+    state.autoplay = false;
+    throw new Error('No song found for autoplay');
+  }
+  state.tracks.push(track);
+  state.currentIndex = state.tracks.length - 1;
+  await playSong(guild);
+  return track;
+}
+
+function clearEndedQueue(guildId, state) {
+  state.currentIndex = -1;
+  state.tracks = [];
+  removePlayerUI(state);
+  scheduleAutoLeave(guildId);
 }
 
 async function playSong(guild) {
@@ -564,6 +734,9 @@ async function playSong(guild) {
 
     sendPlayerUI(state);
     startProgressTimer(state);
+
+    /* Radio: pick ahead in the background so the queue never runs dry */
+    radioNext(guild, state).catch((err) => pen.Error('Music-Prefill', err));
   } catch (err) {
     pen.Error('playSong', err);
     if (state.textChannel) {
@@ -770,6 +943,7 @@ function stop(guildId) {
   const state = getState(guildId);
   // Stay mode: halt playback and clear the queue, but keep the voice connection.
   if (getStay(guildId) || state.stayChannelId) {
+    state.autoplay = false; /* otherwise the radio re-picks on the next Idle */
     clearQueue(guildId);
     state.skipRequested = false;
     return;
@@ -804,6 +978,7 @@ export {
   setVolume,
   shuffleQueue,
   skip,
+  startAutoplay,
   startProgressTimer,
   states,
   stop,

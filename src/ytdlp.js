@@ -111,9 +111,12 @@ export class YtDlp {
     });
   }
 
-  async getPlaylistInfo(url) {
+  async getPlaylistInfo(url, limit = null) {
     return new Promise((resolve, reject) => {
-      const proc = this.exec(['--flat-playlist', '--dump-json', url]);
+      const args = ['--flat-playlist', '--dump-json'];
+      if (limit) args.push('--playlist-items', `1-${limit}`);
+      args.push(url);
+      const proc = this.exec(args);
       let stdout = '';
       let stderr = '';
 
