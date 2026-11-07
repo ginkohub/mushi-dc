@@ -107,6 +107,9 @@ export class Handler {
     /** @type {Map<string, Array<import('./plugin.js').Role>>} */
     this.userRoles = new Map();
 
+    /** @type {Map<string, { channelId: string, joinedAt: number, totalMs: number }>} voice session per guild:user */
+    this.voiceSessions = new Map();
+
     /** @type {import('./user_manager.js').UserManager} */
     this.userManager = new UserManager();
 
@@ -563,6 +566,7 @@ export class Handler {
         guildId: event?.guildId ?? event?.guild?.id ?? null,
         channelId: event?.channelId ?? event?.channel?.id ?? null,
         userId: event?.user?.id ?? event?.author?.id ?? null,
+        username: event?.user?.username ?? event?.author?.username ?? null,
       });
       const ctx = new Ctx({
         handler: this,
@@ -706,12 +710,17 @@ export class Handler {
         }
       }
 
-      /* Plain message / other interaction: metadata only, no content */
-      if (!ctx.isSlash) {
+      /* message-like events only; intents without author/user (voice, member) skip the record */
+      const msgLike =
+        eventType === Events.MessageCreate ||
+        eventType === Events.MessageUpdate ||
+        eventType === Events.InteractionCreate;
+      if (!ctx.isSlash && msgLike) {
         this.activity.record({
           type: 'message',
           eventType,
           messageId: event?.id ?? null,
+          snippet: ctx.text?.slice(0, 200) ?? null,
           ...meta(),
           ok: true,
           latencyMs: Date.now() - t0,
@@ -746,13 +755,433 @@ export class Handler {
       async (o, m) => await this.handle({ eventType: Events.MessageUpdate, event: m, oldEvent: o }),
     );
     this.client.on(Events.MessageCreate, async (m) => await this.handle({ eventType: Events.MessageCreate, event: m }));
+
+    /* messageDelete / messageDeleteBulk */
+    this.client.on(Events.MessageDelete, async (m) => {
+      try {
+        this.activity.record({
+          type: 'message-delete',
+          guildId: m?.guildId ?? m?.channel?.guildId ?? null,
+          channelId: m?.channelId ?? m?.channel?.id ?? null,
+          messageId: m?.id ?? null,
+          snippet: m?.content?.slice(0, 200) ?? null,
+        });
+        await this.handle({ eventType: Events.MessageDelete, event: m });
+      } catch (e) {
+        this.pen.Error('message-delete', e);
+      }
+    });
+    this.client.on(Events.MessageBulkDelete, async (collection) => {
+      try {
+        const first = collection?.first() ?? null;
+        this.activity.record({
+          type: 'message-delete-bulk',
+          guildId: first?.guildId ?? first?.channel?.guildId ?? null,
+          channelId: first?.channelId ?? first?.channel?.id ?? null,
+          count: collection?.size ?? 0,
+        });
+        await this.handle({ eventType: Events.MessageBulkDelete, event: collection });
+      } catch (e) {
+        this.pen.Error('message-delete-bulk', e);
+      }
+    });
+
+    /** create/update/delete wiring: fields(current, old) builds the activity record. */
+    const wireCrud = (addEvt, updEvt, delEvt, prefix, fields) => {
+      this.client.on(addEvt, async (e) => {
+        try {
+          this.activity.record({ type: `${prefix}-create`, ...fields(e, e) });
+          await this.handle({ eventType: addEvt, event: e });
+        } catch (err) {
+          this.pen.Error(`${prefix}-create`, err);
+        }
+      });
+      this.client.on(updEvt, async (oldX, newX) => {
+        try {
+          this.activity.record({ type: `${prefix}-update`, ...fields(newX, oldX) });
+          await this.handle({ eventType: updEvt, event: newX, oldEvent: oldX });
+        } catch (err) {
+          this.pen.Error(`${prefix}-update`, err);
+        }
+      });
+      this.client.on(delEvt, async (e) => {
+        try {
+          this.activity.record({ type: `${prefix}-delete`, ...fields(e, e) });
+          await this.handle({ eventType: delEvt, event: e });
+        } catch (err) {
+          this.pen.Error(`${prefix}-delete`, err);
+        }
+      });
+    };
+    wireCrud(Events.ThreadCreate, Events.ThreadUpdate, Events.ThreadDelete, 'thread', (thread, oldThread) => ({
+      guildId: thread?.guildId ?? thread?.guild?.id ?? null,
+      threadId: thread?.id ?? null,
+      threadName: thread?.name ?? oldThread?.name ?? null,
+    }));
+    wireCrud(Events.RoleCreate, Events.RoleUpdate, Events.RoleDelete, 'role', (role, oldRole) => ({
+      guildId: role?.guildId ?? role?.guild?.id ?? null,
+      roleId: role?.id ?? null,
+      roleName: role?.name ?? oldRole?.name ?? null,
+      oldRoleName: oldRole?.name && oldRole?.name !== role?.name ? oldRole.name : null,
+    }));
+    wireCrud(Events.GuildEmojiCreate, Events.GuildEmojiUpdate, Events.GuildEmojiDelete, 'emoji', (emoji, oldEmoji) => ({
+      guildId: emoji?.guildId ?? emoji?.guild?.id ?? null,
+      emojiId: emoji?.id ?? null,
+      emojiName: emoji?.name ?? oldEmoji?.name ?? null,
+      oldEmojiName: oldEmoji?.name && oldEmoji?.name !== emoji?.name ? oldEmoji.name : null,
+    }));
+    wireCrud(
+      Events.GuildStickerCreate,
+      Events.GuildStickerUpdate,
+      Events.GuildStickerDelete,
+      'sticker',
+      (sticker, oldSticker) => ({
+        guildId: sticker?.guildId ?? sticker?.guild?.id ?? null,
+        stickerId: sticker?.id ?? null,
+        stickerName: sticker?.name ?? oldSticker?.name ?? null,
+        oldStickerName: oldSticker?.name && oldSticker?.name !== sticker?.name ? oldSticker.name : null,
+      }),
+    );
+
+    /* invites */
+    this.client.on(Events.InviteCreate, async (invite) => {
+      try {
+        this.activity.record({
+          type: 'invite-create',
+          guildId: invite?.guildId ?? invite?.guild?.id ?? null,
+          code: invite?.code ?? null,
+          inviterId: invite?.inviterId ?? invite?.inviter?.id ?? null,
+          username: invite?.inviter?.username ?? null,
+          channelId: invite?.channelId ?? null,
+        });
+        await this.handle({ eventType: Events.InviteCreate, event: invite });
+      } catch (e) {
+        this.pen.Error('invite-create', e);
+      }
+    });
+    this.client.on(Events.InviteDelete, async (invite) => {
+      try {
+        this.activity.record({
+          type: 'invite-delete',
+          guildId: invite?.guildId ?? invite?.guild?.id ?? null,
+          code: invite?.code ?? null,
+          channelId: invite?.channelId ?? null,
+        });
+        await this.handle({ eventType: Events.InviteDelete, event: invite });
+      } catch (e) {
+        this.pen.Error('invite-delete', e);
+      }
+    });
+
+    /* bans */
+    this.client.on(Events.GuildBanAdd, async (ban) => {
+      try {
+        this.activity.record({
+          type: 'ban',
+          guildId: ban?.guild?.id ?? ban?.guildId ?? null,
+          userId: ban?.user?.id ?? ban?.id ?? null,
+          username: ban?.user?.username ?? null,
+          reason: ban?.reason ?? null,
+        });
+        await this.handle({ eventType: Events.GuildBanAdd, event: ban });
+      } catch (e) {
+        this.pen.Error('ban', e);
+      }
+    });
+    this.client.on(Events.GuildBanRemove, async (ban) => {
+      try {
+        this.activity.record({
+          type: 'unban',
+          guildId: ban?.guild?.id ?? ban?.guildId ?? null,
+          userId: ban?.user?.id ?? ban?.id ?? null,
+          username: ban?.user?.username ?? null,
+          reason: ban?.reason ?? null,
+        });
+        await this.handle({ eventType: Events.GuildBanRemove, event: ban });
+      } catch (e) {
+        this.pen.Error('unban', e);
+      }
+    });
+
+    /* audit log entries: who did what (executor, action, target) */
+    this.client.on(Events.GuildAuditLogEntryCreate, async (entry, guild) => {
+      try {
+        this.activity.record({
+          type: 'audit',
+          guildId: guild?.id ?? entry?.guild?.id ?? null,
+          actionType: entry?.actionType ?? null,
+          action: entry?.targetType ?? entry?.action ?? null,
+          executorId: entry?.executorId ?? null,
+          username: entry?.executor?.username ?? null,
+          targetName: entry?.target?.name ?? entry?.target?.username ?? entry?.targetTag ?? null,
+          reason: entry?.reason ?? null,
+        });
+        await this.handle({ eventType: Events.GuildAuditLogEntryCreate, event: entry, oldEvent: guild });
+      } catch (e) {
+        this.pen.Error('audit', e);
+      }
+    });
+
+    /* reactions */
+    this.client.on(Events.MessageReactionAdd, async (reaction, user) => {
+      try {
+        this.activity.record({
+          type: 'reaction-add',
+          guildId: reaction?.message?.guildId ?? null,
+          channelId: reaction?.message?.channelId ?? null,
+          messageId: reaction?.message?.id ?? null,
+          emoji: reaction?.emoji?.name ?? null,
+          userId: user?.id ?? null,
+          username: user?.username ?? null,
+        });
+        await this.handle({ eventType: Events.MessageReactionAdd, event: reaction, oldEvent: user });
+      } catch (e) {
+        this.pen.Error('reaction-add', e);
+      }
+    });
+    this.client.on(Events.MessageReactionRemove, async (reaction, user) => {
+      try {
+        this.activity.record({
+          type: 'reaction-remove',
+          guildId: reaction?.message?.guildId ?? null,
+          channelId: reaction?.message?.channelId ?? null,
+          messageId: reaction?.message?.id ?? null,
+          emoji: reaction?.emoji?.name ?? null,
+          userId: user?.id ?? null,
+          username: user?.username ?? null,
+        });
+        await this.handle({ eventType: Events.MessageReactionRemove, event: reaction, oldEvent: user });
+      } catch (e) {
+        this.pen.Error('reaction-remove', e);
+      }
+    });
+
+    /* user rename / avatar change (global) */ /* user rename / avatar change (global) */
+    this.client.on(Events.UserUpdate, async (oldUser, user) => {
+      try {
+        this.activity.record({
+          type: 'user-update',
+          userId: user?.id ?? null,
+          oldUsername: oldUser?.username ?? null,
+          username: user?.username ?? null,
+        });
+        await this.handle({ eventType: Events.UserUpdate, event: user, oldEvent: oldUser });
+      } catch (e) {
+        this.pen.Error('user-update', e);
+      }
+    });
+
+    /* server rename / icon change (global) */
+    this.client.on(Events.GuildUpdate, async (oldGuild, guild) => {
+      try {
+        this.activity.record({
+          type: 'guild-update',
+          guildId: guild?.id ?? null,
+          oldGuildName: oldGuild?.name ?? null,
+          guildName: guild?.name ?? null,
+        });
+        await this.handle({ eventType: Events.GuildUpdate, event: guild, oldEvent: oldGuild });
+      } catch (e) {
+        this.pen.Error('guild-update', e);
+      }
+    });
+
+    /* scheduled events */
+    for (const [evt, type] of [
+      [Events.GuildScheduledEventCreate, 'schedule-create'],
+      [Events.GuildScheduledEventUpdate, 'schedule-update'],
+      [Events.GuildScheduledEventDelete, 'schedule-delete'],
+    ]) {
+      this.client.on(evt, async (e) => {
+        try {
+          this.activity.record({
+            type,
+            guildId: e?.guild?.id ?? e?.guildId ?? null,
+            eventId: e?.id ?? null,
+            eventName: e?.name ?? null,
+            startAt: e?.scheduledStartTimestamp ?? null,
+          });
+          await this.handle({ eventType: evt, event: e });
+        } catch (err) {
+          this.pen.Error(type, err);
+        }
+      });
+    }
+    this.client.on(Events.GuildScheduledEventUserAdd, async (e, user) => {
+      try {
+        this.activity.record({
+          type: 'schedule-subscribe',
+          guildId: e?.guild?.id ?? null,
+          eventId: e?.id ?? null,
+          eventName: e?.name ?? null,
+          userId: user?.id ?? null,
+          username: user?.username ?? null,
+        });
+        await this.handle({ eventType: Events.GuildScheduledEventUserAdd, event: e, oldEvent: user });
+      } catch (err) {
+        this.pen.Error('schedule-subscribe', err);
+      }
+    });
+    this.client.on(Events.GuildScheduledEventUserRemove, async (e, user) => {
+      try {
+        this.activity.record({
+          type: 'schedule-unsubscribe',
+          guildId: e?.guild?.id ?? null,
+          eventId: e?.id ?? null,
+          eventName: e?.name ?? null,
+          userId: user?.id ?? null,
+          username: user?.username ?? null,
+        });
+        await this.handle({ eventType: Events.GuildScheduledEventUserRemove, event: e, oldEvent: user });
+      } catch (err) {
+        this.pen.Error('schedule-unsubscribe', err);
+      }
+    });
+
+    /* webhook create/delete is audit-level info; this event fires per channel */
+    this.client.on(Events.WebhooksUpdate, async (guild, channel) => {
+      try {
+        this.activity.record({
+          type: 'webhook-update',
+          guildId: guild?.id ?? channel?.guildId ?? null,
+          channelId: channel?.id ?? null,
+          channelName: channel?.name ?? null,
+        });
+        await this.handle({ eventType: Events.WebhooksUpdate, event: channel, oldEvent: guild });
+      } catch (e) {
+        this.pen.Error('webhook-update', e);
+      }
+    });
+
+    /* Member join/leave: activity record + listener plugins */
+    for (const [evt, type] of [
+      [Events.GuildMemberAdd, 'member-join'],
+      [Events.GuildMemberRemove, 'member-leave'],
+    ]) {
+      this.client.on(evt, async (member) => {
+        try {
+          this.activity.record({
+            type,
+            guildId: member?.guild?.id ?? null,
+            userId: member?.id ?? null,
+            username: member?.user?.username ?? member?.id ?? null,
+          });
+          await this.handle({ eventType: evt, eventName: evt, event: member });
+          /* Leaving the server ends any voice session */
+          if (type === 'member-leave') this.voiceSessions.delete(`${member?.guild?.id}:${member?.id}`);
+        } catch (e) {
+          this.pen.Error(type, e);
+        }
+      });
+    }
+
     this.client.on(Events.ChannelDelete, async (ch) => {
       try {
+        this.activity.record({
+          type: 'channel-delete',
+          guildId: ch?.guild?.id ?? ch?.guildId ?? null,
+          channelId: ch?.id ?? null,
+          channelName: ch?.name ?? null,
+        });
+        await this.handle({ eventType: Events.ChannelDelete, event: ch });
         if (!ch?.isVoiceBased?.()) return;
         const { handleVoiceChannelDelete } = await import('./plugins/music/_player.js');
         handleVoiceChannelDelete(ch.guild?.id ?? ch.guildId, ch.id);
       } catch (e) {
         this.pen.Error('channel-delete', e?.message ?? e);
+      }
+    });
+    this.client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
+      try {
+        const { channelId: oldChannelId } = oldState;
+        const { channelId: newChannelId } = newState;
+
+        /* Same channel: only mute/deaf/screen changes dispatch to listener plugins */
+        if (oldChannelId === newChannelId) {
+          const changed =
+            oldState.selfMute !== newState.selfMute ||
+            oldState.selfDeaf !== newState.selfDeaf ||
+            oldState.serverMute !== newState.serverMute ||
+            oldState.serverDeaf !== newState.serverDeaf ||
+            oldState.streaming !== newState.streaming ||
+            oldState.selfVideo !== newState.selfVideo;
+          if (!changed) return;
+          await this.handle({
+            eventType: Events.VoiceStateUpdate,
+            eventName: Events.VoiceStateUpdate,
+            event: newState,
+            oldEvent: oldState,
+          });
+          return;
+        }
+
+        const userId = newState.id;
+        const member = newState.guild?.members.cache.get(userId);
+        const username = member?.user?.username ?? userId;
+        const guildId = newState.guild?.id ?? null;
+        const key = `${guildId}:${userId}`;
+
+        if (!oldChannelId && newChannelId) {
+          const ch = newState.channel;
+          this.voiceSessions.set(key, { channelId: newChannelId, joinedAt: Date.now(), totalMs: 0 });
+          this.activity.record({
+            type: 'voice-join',
+            guildId,
+            channelId: newChannelId,
+            channelName: ch?.name ?? null,
+            userId,
+            username,
+          });
+        } else if (oldChannelId && !newChannelId) {
+          const ch = oldState.channel;
+          const s = this.voiceSessions.get(key);
+          const segMs = s ? Date.now() - s.joinedAt : null;
+          const totalMs = s && segMs !== null ? s.totalMs + segMs : null;
+          this.activity.record({
+            type: 'voice-leave',
+            guildId,
+            channelId: oldChannelId,
+            channelName: ch?.name ?? null,
+            userId,
+            username,
+            durationMs: segMs,
+            totalMs,
+          });
+        } else {
+          const oldCh = oldState.channel;
+          const newCh = newState.channel;
+          const s = this.voiceSessions.get(key);
+          const segMs = s ? Date.now() - s.joinedAt : null;
+          if (s) {
+            s.totalMs += segMs;
+            s.channelId = newChannelId;
+            s.joinedAt = Date.now();
+          }
+          this.activity.record({
+            type: 'voice-move',
+            guildId,
+            channelId: newChannelId,
+            channelName: newCh?.name ?? null,
+            fromChannelId: oldChannelId,
+            fromChannelName: oldCh?.name ?? null,
+            userId,
+            username,
+            durationMs: segMs,
+          });
+        }
+
+        /* Listener plugins see voice changes as ctx.event/ctx.oldEvent */
+        await this.handle({
+          eventType: Events.VoiceStateUpdate,
+          eventName: Events.VoiceStateUpdate,
+          event: newState,
+          oldEvent: oldState,
+        });
+
+        /* Session ends after dispatch so the leave duration stays readable */
+        if (oldChannelId && !newChannelId) this.voiceSessions.delete(key);
+      } catch (e) {
+        this.pen.Error('voice-state-update', e?.message ?? e);
       }
     });
     if (this.useSlash)

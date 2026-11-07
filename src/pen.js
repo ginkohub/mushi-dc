@@ -18,7 +18,7 @@ export const LL_WARN = 3;
 export const LL_ERROR = 4;
 
 /** @type {string} */
-export const TIME_FORMAT = 'HH:mm:ss.SSS';
+export const TIME_FORMAT = 'YYYY-MM-DD HH:mm:ss.SSS';
 
 /**
  * getTime returns the current time in the specified format.
@@ -32,10 +32,13 @@ export function getTime(format) {
   }
   const now = new Date();
   const repl = {
-    HH: now.getHours().toString().padStart(2, '0'),
-    mm: now.getMinutes().toString().padStart(2, '0'),
-    ss: now.getSeconds().toString().padStart(2, '0'),
-    SSS: now.getMilliseconds().toString().padStart(3, '0'),
+    YYYY: String(now.getFullYear()),
+    MM: String(now.getMonth() + 1).padStart(2, '0'),
+    DD: String(now.getDate()).padStart(2, '0'),
+    HH: String(now.getHours()).padStart(2, '0'),
+    mm: String(now.getMinutes()).padStart(2, '0'),
+    ss: String(now.getSeconds()).padStart(2, '0'),
+    SSS: String(now.getMilliseconds()).padStart(3, '0'),
   };
 
   for (const key in repl) {
@@ -287,6 +290,6 @@ export class Pen {
   }
 }
 
-export const pen = new Pen({ format: 'HH:mm:ss' });
+export const pen = new Pen({ format: 'YYYY-MM-DD HH:mm:ss' });
 
 export default pen;

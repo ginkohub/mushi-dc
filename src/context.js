@@ -158,6 +158,9 @@ export class Ctx {
     /** @type {boolean} */
     this.isEdited = oldEvent != null;
 
+    /** @type {import('discord.js').Message | import('discord.js').VoiceState} */
+    this.oldEvent = oldEvent;
+
     /** @type {string} */
     this.quotedId = event?.reference?.messageId;
 
