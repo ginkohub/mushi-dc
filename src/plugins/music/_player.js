@@ -531,63 +531,73 @@ const AUTOPLAY_SEEDS = [
   'viral hits playlist',
 ];
 
-/** Next autoplay pick: YouTube Mix of the last played track, else a random seed search. */
+const toTrack = (r, requester) => {
+  const url = r?.url || (r?.id ? `https://youtube.com/watch?v=${r.id}` : null);
+  if (!url || !r.title) return null;
+  return {
+    url,
+    title: r.title,
+    artist: r.artist ?? r.uploader ?? r.channel ?? null,
+    duration: r.duration || 0,
+    thumbnail: r.thumbnail ?? null,
+    source: 'youtube',
+    requester: requester ?? null,
+  };
+};
+
+/** Bulk-load a seed's YouTube Mix into the queue (deduped). Returns count added. */
+async function loadMixTracks(state, seed) {
+  const key = getTrackKey(seed);
+  const seedId = key.startsWith('yt:') ? key.slice(3) : null;
+  if (!seedId) return 0;
+
+  try {
+    const mix = await (await getYT()).getPlaylistInfo(
+      `https://youtube.com/watch?v=${seedId}&list=RD${seedId}`,
+      50 /* one page of the mix — full flat-page is ~400 entries and takes 15s+ */,
+    );
+    const existingKeys = new Set(state.tracks.map(getTrackKey));
+    const toAdd = [];
+    for (const r of mix ?? []) {
+      const track = toTrack(r, seed.requester);
+      if (!track) continue;
+      const k = getTrackKey(track);
+      if (!k || existingKeys.has(k)) continue;
+      existingKeys.add(k);
+      toAdd.push(track);
+    }
+    if (toAdd.length === 0) return 0;
+    state.tracks.push(...toAdd);
+    return toAdd.length;
+  } catch {
+    return 0;
+  }
+}
+
+/** Next autoplay pick: bulk-load the last track's YouTube Mix into the queue,
+ *  else fall back to a single-track search. The returned track is already in state.tracks. */
 async function pickAutoplayTrack(state) {
   const seed = state.tracks[state.tracks.length - 1] ?? null;
-  const toTrack = (r) => {
-    const url = r?.url || (r?.id ? `https://youtube.com/watch?v=${r.id}` : null);
-    if (!url || !r.title) return null;
-    return {
-      url,
-      title: r.title,
-      artist: r.artist ?? r.uploader ?? r.channel ?? null,
-      duration: r.duration || 0,
-      thumbnail: r.thumbnail ?? null,
-      source: 'youtube',
-      requester: seed?.requester ?? null,
-    };
-  };
+  if (!seed) return null;
 
-  if (seed) {
-    const key = getTrackKey(seed);
-    const seedId = key.startsWith('yt:') ? key.slice(3) : null;
-    if (seedId) {
-      try {
-        const mix = await (await getYT()).getPlaylistInfo(
-          `https://youtube.com/watch?v=${seedId}&list=RD${seedId}`,
-          20 /* one page of the mix — full flat-page is ~400 entries and takes 15s+ */,
-        );
-        for (const r of mix ?? []) {
-          const track = toTrack(r);
-          if (!track || isDuplicateTrack(track, state.tracks)) continue;
-          return track;
-        }
-      } catch {
-        /* mix fetch failed — fall back to search below */
-      }
-    }
-    /* Non-YT seed (no mix available) or mix fetch failed */
-    const query = [seed.artist, seed.title].filter(Boolean).join(' ') || seed.title;
-    const yt = await getYT();
-    const results = (await yt.search(query, 10).catch(() => null)) ?? [];
-    for (const r of results) {
-      const track = toTrack(r);
-      if (!track || isDuplicateTrack(track, state.tracks)) continue;
-      return track;
-    }
-    return null;
+  /* Bulk-load the last song's YouTube Mix so the radio drains a queue,
+   * not re-queries one track at a time. */
+  const added = await loadMixTracks(state, seed);
+  if (added > 0) {
+    return state.tracks[state.tracks.length - added]; /* first newly added track */
   }
 
-  const query = AUTOPLAY_SEEDS[Math.floor(Math.random() * AUTOPLAY_SEEDS.length)];
+  /* Mix failed or non-YouTube seed: fall back to single-track search */
+  const query = [seed.artist, seed.title].filter(Boolean).join(' ') || seed.title;
   const yt = await getYT();
-  const results = (await yt.search(query, 25).catch(() => null)) ?? [];
-  const picks = [];
+  const results = (await yt.search(query, 10).catch(() => null)) ?? [];
   for (const r of results) {
-    const track = toTrack(r);
+    const track = toTrack(r, seed.requester);
     if (!track || isDuplicateTrack(track, state.tracks)) continue;
-    picks.push(track);
+    state.tracks.push(track);
+    return track;
   }
-  return picks.length ? picks[Math.floor(Math.random() * picks.length)] : null;
+  return null;
 }
 
 /** Returns the next radio track, appending it to the queue. Awaited pick dedupes via state.nextPick. */
@@ -615,7 +625,7 @@ async function radioNext(guild, state) {
 
   const track = await state.nextPick;
   if (track) {
-    state.tracks.push(track);
+    /* track already in state.tracks via bulk-load in pickAutoplayTrack */
     sendPlayerUI(state); /* edits the same message: picking view → Up next / Now playing */
     return track;
   }
@@ -648,15 +658,43 @@ async function startAutoplay(guild, voiceChannel, seed = null) {
   const isPlaying = state.current !== null && state.player.state.status !== AudioPlayerStatus.Idle;
   if (isPlaying) return null;
 
-  const track = seed ?? (await pickAutoplayTrack(state));
-  if (!track) {
+  if (seed) {
+    /* Bulk-load the seed's YouTube Mix so the queue isn't just one song */
+    const added = await loadMixTracks(state, seed);
+    if (added === 0) {
+      state.tracks.push(seed);
+      state.currentIndex = state.tracks.length - 1;
+    } else {
+      state.currentIndex = state.tracks.length - added;
+    }
+    await playSong(guild);
+    return seed;
+  }
+
+  /* No seed: random search, then bulk-load its mix */
+  const query = AUTOPLAY_SEEDS[Math.floor(Math.random() * AUTOPLAY_SEEDS.length)];
+  const yt = await getYT();
+  const results = (await yt.search(query, 25).catch(() => null)) ?? [];
+  const picks = [];
+  for (const r of results) {
+    const track = toTrack(r, null);
+    if (!track || isDuplicateTrack(track, state.tracks)) continue;
+    picks.push(track);
+  }
+  if (!picks.length) {
     state.autoplay = false;
     throw new Error('No song found for autoplay');
   }
-  state.tracks.push(track);
-  state.currentIndex = state.tracks.length - 1;
+  const seedTrack = picks[Math.floor(Math.random() * picks.length)];
+  const added = await loadMixTracks(state, seedTrack);
+  if (added === 0) {
+    state.tracks.push(seedTrack);
+    state.currentIndex = state.tracks.length - 1;
+  } else {
+    state.currentIndex = state.tracks.length - added;
+  }
   await playSong(guild);
-  return track;
+  return seedTrack;
 }
 
 function clearEndedQueue(guildId, state) {

@@ -14,10 +14,48 @@
 
 import { AudioPlayerStatus } from '@discordjs/voice';
 import { ApplicationIntegrationType, InteractionContextType, SlashCommandBuilder } from 'discord.js';
-import { Role } from '#mushi';
-import { resolveSong } from '#mushi/sources.js';
-import { clearQueue, disconnect, formatDuration, getState, getStay, sendPlayerUI, startAutoplay } from './_player.js';
+import { matchSource, Role } from '#mushi';
+import { resolvePlaylist, resolveSong } from '#mushi/sources.js';
+import {
+  clearQueue,
+  connect,
+  disconnect,
+  formatDuration,
+  getState,
+  getStay,
+  getTrackKey,
+  playSong,
+  sendPlayerUI,
+  startAutoplay,
+} from './_player.js';
 import { playAutocomplete } from './play.js';
+
+/** Bulk-load a playlist/mix into the queue (deduped), then let the radio drain it. */
+async function loadPlaylist(state, query, senderId) {
+  const entries = await resolvePlaylist(query);
+  if (!entries.length) return 0;
+
+  const existingKeys = new Set(state.tracks.map(getTrackKey));
+  const newTracks = [];
+  for (const e of entries) {
+    const track = {
+      url: e.url,
+      title: e.title || 'Unknown',
+      duration: e.duration || 0,
+      thumbnail: e.thumbnail || null,
+      source: e.source,
+      requester: senderId,
+    };
+    const key = getTrackKey(track);
+    if (!key || existingKeys.has(key)) continue;
+    existingKeys.add(key);
+    newTracks.push(track);
+  }
+
+  if (newTracks.length === 0) return 0;
+  state.tracks.push(...newTracks);
+  return newTracks.length;
+}
 
 async function execSlash(c) {
   const guild = c.event.guild;
@@ -28,6 +66,45 @@ async function execSlash(c) {
 
   const state = getState(guild.id);
   if (!state.textChannel) state.textChannel = c.event.channel; /* player UI lives where /autoplay was called */
+
+  const query = (c.event.options.getString('query') || '').trim();
+  const isUrl = /^https?:\/\//.test(query);
+  const matched = isUrl ? matchSource(query) : null;
+  const isPlaylist =
+    isUrl &&
+    (/youtube\.com\/playlist\?list=/.test(query) ||
+      /(?:youtube\.com|youtu\.be)\/.*[?&]list=([a-zA-Z0-9_-]+)/.test(query) ||
+      (matched?.id === 'spotify' && /\/playlist|\/album\//.test(query)));
+
+  /* Playlist / mix: dump ALL songs into the queue, radio drains it instead of re-picking one by one. */
+  if (isPlaylist) {
+    await c.event.deferReply();
+    try {
+      const added = await loadPlaylist(state, query, c.senderId);
+      if (added === 0) return await c.event.editReply('All songs from this playlist are already in the queue.');
+
+      state.autoplay = true;
+      await sendPlayerUI(state);
+
+      const isPlaying = state.current !== null && state.player.state.status !== AudioPlayerStatus.Idle;
+      if (!isPlaying) {
+        if (state.currentIndex === -1 || state.currentIndex >= state.tracks.length) {
+          state.currentIndex = state.tracks.length - added;
+        }
+        await connect(guild, voiceChannel);
+        playSong(guild);
+      }
+
+      await c.event.editReply(
+        `Autoplay is **on** — loaded **${added} song(s)** from playlist. I'll play them, then keep mixing.`,
+      );
+    } catch {
+      state.autoplay = false;
+      await c.event.editReply('Could not load that playlist.');
+    }
+    return;
+  }
+
   if (state.autoplay) return await c.reply('Autoplay is already **on**.');
 
   const wasConnected = !!state.connection;
@@ -35,7 +112,6 @@ async function execSlash(c) {
 
   try {
     let seed = null;
-    const query = (c.event.options.getString('query') || '').trim();
     if (query) {
       seed = await resolveSong(query);
       if (!seed) return await c.event.editReply('No results found.');
